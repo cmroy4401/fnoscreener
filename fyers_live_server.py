@@ -11,7 +11,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fyers_apiv3 import fyersModel
+# from fyers_apiv3 import fyersModel  # Comment out करो
+# Fyers API के लिए manual requests use करेंगे
+fyersModel = None
 
 try:
     import smc_ict_engine as engine

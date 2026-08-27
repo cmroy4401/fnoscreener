@@ -1,0 +1,8 @@
+fyers_config.json
+access_token.txt
+*.log
+__pycache__/
+.env
+*.db
+.DS_Store
+*.pyc

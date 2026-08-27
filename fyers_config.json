@@ -1,10 +1,8 @@
 {
-    
-    "client_id": "DWCC4FKEIC-100",
+"client_id": "DWCC4FKEIC-100",
     "secret_key": "FMHPU54NON",
     "redirect_uri": "https://trade.fyers.in/api-login/redirect-uri/index.html",
     "fy_id": "XL03391",
     "pin": "5633",
-    "totp_key": "B5UUNDP2RRQDLIAL32PK3V2FBKACQUEG"
-
+    "totp_key": "B5UUNDP2RRQDLIAL32PK3V2FBKACQUEG"   
 }

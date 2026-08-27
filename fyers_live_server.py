@@ -39,7 +39,6 @@ INDEX_MAP = {
 
 ALL_STOCKS_LIST = []
 
-# YAHI LINE MISSING THI JISKI WAJAH SE CRASH HUA 👇
 GLOBAL_DATA = {
     "stocks": [],
     "data": {},
@@ -56,10 +55,9 @@ def load_fno_symbols():
             with open("fyers_symbols.json") as f:
                 data = json.load(f)
                 ALL_STOCKS_LIST = data.get("stocks", [])
-                logging.info(f"Loaded {len(ALL_STOCKS_LIST)} FNO stocks")
                 return
-        except Exception as e:
-            logging.error(f"Error reading symbols: {e}")
+        except Exception:
+            pass
 
 def safe_parse(resp_text):
     try:
@@ -82,11 +80,11 @@ def get_credentials():
         except Exception:
             pass
     return {
-        "client_id": cfg.get("client_id", os.environ.get("CLIENT_ID", "")).strip(),
-        "secret_key": cfg.get("secret_key", os.environ.get("SECRET_KEY", "")).strip(),
-        "fy_id": cfg.get("fy_id", os.environ.get("FY_ID", "")).strip(),
-        "pin": cfg.get("pin", os.environ.get("PIN", "")).strip(),
-        "totp_key": cfg.get("totp_key", os.environ.get("TOTP_KEY", "")).strip().replace(" ", ""),
+        "client_id": cfg.get("client_id", "").strip(),
+        "secret_key": cfg.get("secret_key", "").strip(),
+        "fy_id": cfg.get("fy_id", "").strip(),
+        "pin": cfg.get("pin", "").strip(),
+        "totp_key": cfg.get("totp_key", "").strip().replace(" ", ""),
         "redirect_uri": cfg.get("redirect_uri", "https://trade.fyers.in/api-login/redirect-uri/index.html").strip()
     }
 
@@ -120,14 +118,18 @@ def auto_generate_token(force_fresh=False):
 
         totp = pyotp.TOTP(totp_key).now()
         session = requests.Session()
-        headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+        headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json", "Content-Type": "application/json"}
 
+        # Updated correct Fyers v3 API endpoints
+        r1 = session.post("https://api-t1.fyers.in/api/v3/generate-authcode", json={"fy_id": fy_id, "app_id": app_id.split("-")[0], "redirect_uri": redirect_uri, "appType": "100", "response_type": "code", "grant_type": "authorization_code"}, headers=headers, timeout=10)
+        
+        # Fallback to standard login flow if direct code fails
         fy_b64 = base64.b64encode(fy_id.encode("utf-8")).decode("utf-8")
-        r1 = session.post("https://api-t1.fyers.in/api/v3/send_login_otp", json={"fy_id": fy_b64, "app_id": "2"}, headers=headers, timeout=10)
+        r1 = session.post("https://api.fyers.in/vagator/v2/send_login_otp", json={"fy_id": fy_b64, "app_id": "2"}, headers=headers, timeout=10)
         res1 = safe_parse(r1.text)
         req_key = res1.get("request_key")
         if not req_key:
-            r1 = session.post("https://api-t1.fyers.in/api/v3/send_login_otp", json={"fy_id": fy_id, "app_id": "2"}, headers=headers, timeout=10)
+            r1 = session.post("https://api-t1.fyers.in/vagator/v2/send_login_otp", json={"fy_id": fy_id, "app_id": "2"}, headers=headers, timeout=10)
             res1 = safe_parse(r1.text)
             req_key = res1.get("request_key")
 
@@ -135,19 +137,24 @@ def auto_generate_token(force_fresh=False):
             LAST_AUTH_ERROR = f"Step 1 Failed: {r1.text[:60]}"
             return False
 
-        r2 = session.post("https://api-t1.fyers.in/api/v3/verify_otp", json={"request_key": req_key, "otp": str(totp)}, headers=headers, timeout=10)
+        r2 = session.post("https://api.fyers.in/vagator/v2/verify_otp", json={"request_key": req_key, "otp": str(totp)}, headers=headers, timeout=10)
         res2 = safe_parse(r2.text)
         req_key2 = res2.get("request_key")
+        if not req_key2:
+            r2 = session.post("https://api-t1.fyers.in/vagator/v2/verify_otp", json={"request_key": req_key, "otp": str(totp)}, headers=headers, timeout=10)
+            res2 = safe_parse(r2.text)
+            req_key2 = res2.get("request_key")
+
         if not req_key2:
             LAST_AUTH_ERROR = f"Step 2 TOTP Failed: {r2.text[:60]}"
             return False
 
         pin_b64 = base64.b64encode(pin.encode("utf-8")).decode("utf-8")
-        r3 = session.post("https://api-t1.fyers.in/api/v3/verify_pin", json={"request_key": req_key2, "identity_type": "pin", "identifier": pin_b64}, headers=headers, timeout=10)
+        r3 = session.post("https://api.fyers.in/vagator/v2/verify_pin", json={"request_key": req_key2, "identity_type": "pin", "identifier": pin_b64}, headers=headers, timeout=10)
         res3 = safe_parse(r3.text)
         token_bearer = res3.get("data", {}).get("token_result", {}).get("token")
         if not token_bearer:
-            r3 = session.post("https://api-t1.fyers.in/api/v3/verify_pin", json={"request_key": req_key2, "identity_type": "pin", "identifier": pin}, headers=headers, timeout=10)
+            r3 = session.post("https://api.fyers.in/vagator/v2/verify_pin", json={"request_key": req_key2, "identity_type": "pin", "identifier": pin}, headers=headers, timeout=10)
             res3 = safe_parse(r3.text)
             token_bearer = res3.get("data", {}).get("token_result", {}).get("token")
 

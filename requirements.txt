@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+websockets
+fyers-apiv3
+requests
+pyotp
+httpx
+python-multipart

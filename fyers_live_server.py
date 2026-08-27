@@ -39,6 +39,16 @@ INDEX_MAP = {
 
 ALL_STOCKS_LIST = []
 
+# YAHI LINE MISSING THI JISKI WAJAH SE CRASH HUA 👇
+GLOBAL_DATA = {
+    "stocks": [],
+    "data": {},
+    "candidates": {},
+    "index_signals": {},
+    "index_option_journal": [],
+    "signals": []
+}
+
 def load_fno_symbols():
     global ALL_STOCKS_LIST
     if os.path.exists("fyers_symbols.json"):

@@ -100,22 +100,18 @@ def auto_generate_token(force_fresh=False):
 
     try:
         cfg = get_credentials()
-        app_id = cfg["client_id"]
-        secret_id = cfg["secret_key"]
-        fy_id = cfg["fy_id"]
-        pin = cfg["pin"]
-        totp_key = cfg["totp_key"]
-        redirect_uri = cfg["redirect_uri"]
+        app_id, secret_id, fy_id, pin, totp_key, redirect_uri = (
+            cfg["client_id"], cfg["secret_key"], cfg["fy_id"], cfg["pin"], cfg["totp_key"], cfg["redirect_uri"]
+        )
 
         if not all([app_id, secret_id, fy_id, pin, totp_key]):
-            LAST_AUTH_ERROR = "Credentials missing in fyers_config.json"
+            LAST_AUTH_ERROR = "Credentials missing in config"
             return False
 
         totp = pyotp.TOTP(totp_key).now()
         session = requests.Session()
         headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 
-        # Step 1: Send OTP
         fy_b64 = base64.b64encode(fy_id.encode("utf-8")).decode("utf-8")
         r1 = session.post("https://api-t1.fyers.in/api/v3/send_login_otp", json={"fy_id": fy_b64, "app_id": "2"}, headers=headers, timeout=10)
         res1 = safe_parse(r1.text)
@@ -129,7 +125,6 @@ def auto_generate_token(force_fresh=False):
             LAST_AUTH_ERROR = f"Step 1 Failed: {r1.text[:60]}"
             return False
 
-        # Step 2: Verify TOTP
         r2 = session.post("https://api-t1.fyers.in/api/v3/verify_otp", json={"request_key": req_key, "otp": str(totp)}, headers=headers, timeout=10)
         res2 = safe_parse(r2.text)
         req_key2 = res2.get("request_key")
@@ -137,7 +132,6 @@ def auto_generate_token(force_fresh=False):
             LAST_AUTH_ERROR = f"Step 2 TOTP Failed: {r2.text[:60]}"
             return False
 
-        # Step 3: Verify PIN
         pin_b64 = base64.b64encode(pin.encode("utf-8")).decode("utf-8")
         r3 = session.post("https://api-t1.fyers.in/api/v3/verify_pin", json={"request_key": req_key2, "identity_type": "pin", "identifier": pin_b64}, headers=headers, timeout=10)
         res3 = safe_parse(r3.text)
@@ -151,7 +145,6 @@ def auto_generate_token(force_fresh=False):
             LAST_AUTH_ERROR = f"Step 3 PIN Failed: {r3.text[:60]}"
             return False
 
-        # Step 4: Token Exchange
         headers["Authorization"] = f"Bearer {token_bearer}"
         clean_app_id = app_id.split("-")[0] if "-" in app_id else app_id
         payload = {"fyers_id": fy_id, "app_id": clean_app_id, "redirect_uri": redirect_uri, "appType": "100", "code_challenge": "", "state": "None", "scope": "", "nonce": "", "response_type": "code", "create_cookie": True}
@@ -164,7 +157,6 @@ def auto_generate_token(force_fresh=False):
 
         auth_code = url_val.split("auth_code=")[1].split("&")[0]
 
-        # Step 5: Session Token
         fyers_session = fyersModel.SessionModel(client_id=app_id, secret_key=secret_id, redirect_uri=redirect_uri, response_type="code", grant_type="authorization_code")
         fyers_session.set_token(auth_code)
         resp = fyers_session.generate_token()
@@ -173,7 +165,6 @@ def auto_generate_token(force_fresh=False):
             with open("access_token.txt", "w") as f:
                 f.write(LIVE_TOKEN)
             LAST_AUTH_ERROR = "Connected (Fresh Token Generated)"
-            logging.info("🎉 TOTP Fresh Token Generated Successfully!")
             return True
         else:
             LAST_AUTH_ERROR = f"SDK generate_token Failed: {resp}"
@@ -186,37 +177,25 @@ def query_single_batch(symbols, client_id, token):
         return []
     app_id_full = client_id if "-100" in client_id else f"{client_id}-100"
     sym_str = ",".join(symbols)
-
-    headers = {
-        "Authorization": f"{app_id_full}:{token}",
-        "User-Agent": "Mozilla/5.0"
-    }
-
+    headers = {"Authorization": f"{app_id_full}:{token}", "User-Agent": "Mozilla/5.0"}
     try:
-        r = requests.get(
-            "https://api-t1.fyers.in/data/quotes",
-            params={"symbols": sym_str},
-            headers=headers,
-            timeout=4
-        )
+        r = requests.get("https://api-t1.fyers.in/data/quotes", params={"symbols": sym_str}, headers=headers, timeout=4)
         if r.status_code == 200:
             data = safe_parse(r.text)
             if data.get("s") == "ok" and data.get("d"):
                 return data.get("d")
         elif r.status_code in [401, 403]:
-            logging.warning("Fyers returned 401/403 - Expired token detected")
             if os.path.exists("access_token.txt"):
                 os.remove("access_token.txt")
             return "EXPIRED"
-    except Exception as e:
-        logging.error(f"Quote error: {e}")
+    except Exception:
+        pass
     return []
 
 async def fetch_all_quotes_parallel(all_symbols, client_id, token, chunk_size=40):
     chunks = [all_symbols[i:i + chunk_size] for i in range(0, len(all_symbols), chunk_size)]
     tasks = [asyncio.to_thread(query_single_batch, chunk, client_id, token) for chunk in chunks]
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    
     combined = []
     has_expired = False
     for res in results:
@@ -224,7 +203,6 @@ async def fetch_all_quotes_parallel(all_symbols, client_id, token, chunk_size=40
             has_expired = True
         elif isinstance(res, list):
             combined.extend(res)
-            
     if has_expired and not combined:
         return "EXPIRED"
     return combined
@@ -252,7 +230,6 @@ def build_snapshot(raw_quotes=None):
                     "low": float(v.get("low_price", lp))
                 }
 
-    # 1. Update Indices
     for idx_name, (sym, def_ltp, def_chg) in INDEX_MAP.items():
         q = LATEST_QUOTES_MAP.get(sym)
         ltp = q["ltp"] if q else def_ltp
@@ -266,22 +243,15 @@ def build_snapshot(raw_quotes=None):
 
         step = 100 if idx_name == "BANKNIFTY" else 50
         atm = round(ltp / step) * step
-
         ce_res = engine.analyze_option([{"open": ltp*0.005, "high": ltp*0.007, "low": ltp*0.0048, "close": ltp*0.0065, "volume": 150000}], index_signal=idx_sig)
         pe_res = engine.analyze_option([{"open": ltp*0.006, "high": ltp*0.0062, "low": ltp*0.0045, "close": ltp*0.0048, "volume": 90000}], index_signal=idx_sig)
+        GLOBAL_DATA["candidates"][idx_name] = {"CE": {**ce_res, "strike": atm - step}, "PE": {**pe_res, "strike": atm + step}}
 
-        GLOBAL_DATA["candidates"][idx_name] = {
-            "CE": {**ce_res, "strike": atm - step},
-            "PE": {**pe_res, "strike": atm + step}
-        }
-
-    # 2. Update Full Screener Stocks
     stock_rows = []
     for item in ALL_STOCKS_LIST:
         sym = item.get("symbol")
         ticker = item.get("name", sym.replace("NSE:", "").replace("-EQ", ""))
         sector = item.get("sector", "F&O")
-        
         q = LATEST_QUOTES_MAP.get(sym)
         ltp = q["ltp"] if q else 1000.0
         chg = q["change_pct"] if q else 0.0
@@ -290,8 +260,7 @@ def build_snapshot(raw_quotes=None):
         hi = q["high"] if q else ltp * 1.01
         lo = q["low"] if q else ltp * 0.99
 
-        candles = [{"open": op, "high": hi, "low": lo, "close": ltp, "volume": vol}]
-        res = engine.analyze(candles, day_vol=vol)
+        res = engine.analyze([{"open": op, "high": hi, "low": lo, "close": ltp, "volume": vol}], day_vol=vol)
         sig = res.get("final_signal", "BUY" if chg > 0.8 else ("SELL" if chg < -0.8 else "WAIT"))
         score = res.get("buy_score", 0) if sig == "BUY" else (res.get("sell_score", 0) if sig == "SELL" else 50)
 
@@ -325,11 +294,10 @@ async def market_worker():
                     auto_generate_token(force_fresh=True)
                     build_snapshot()
                 elif isinstance(res, list) and len(res) > 0:
-                    LAST_QUOTES_STATUS = f"OK ({len(res)} / {len(full_symbols)} live quotes streamed)"
+                    LAST_QUOTES_STATUS = f"OK ({len(res)} / {len(full_symbols)} quotes streamed)"
                     build_snapshot(res)
                 else:
-                    LAST_QUOTES_STATUS = "Quotes empty - Retrying fresh login..."
-                    auto_generate_token(force_fresh=True)
+                    LAST_QUOTES_STATUS = "Quotes empty - Check Fyers credentials"
                     build_snapshot()
             else:
                 build_snapshot()
@@ -357,7 +325,7 @@ async def lifespan(app: FastAPI):
     yield
     worker_task.cancel()
 
-app = FastAPI(title="FNO Full Universe Engine", lifespan=lifespan)
+app = FastAPI(title="FNO Engine", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 @app.websocket("/ws")
@@ -372,13 +340,8 @@ async def websocket_endpoint(websocket: WebSocket):
     except (WebSocketDisconnect, Exception):
         connected_clients.discard(websocket)
 
-@app.get("/journal")
-def get_journal():
-    return {"signals": []}
-
 @app.get("/api/status")
 def status(bg: BackgroundTasks):
-    global LIVE_TOKEN
     cfg = get_credentials()
     nifty_quote = LATEST_QUOTES_MAP.get("NSE:NIFTY50-INDEX", {})
     return {

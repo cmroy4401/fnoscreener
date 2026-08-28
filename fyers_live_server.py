@@ -93,12 +93,12 @@ def get_credentials():
     
     # Fall back to environment variables
     return {
-        "client_id": (cfg.get("client_id") or os.environ.get("FYERS_CLIENT_ID", "")).strip(),
-        "secret_key": (cfg.get("secret_key") or os.environ.get("FYERS_SECRET_KEY", "")).strip(),
-        "fy_id": (cfg.get("fy_id") or os.environ.get("FYERS_FY_ID", "")).strip(),
-        "pin": (cfg.get("pin") or os.environ.get("FYERS_PIN", "")).strip(),
-        "totp_key": (cfg.get("totp_key") or os.environ.get("FYERS_TOTP_KEY", "")).strip().replace(" ", ""),
-        "redirect_uri": (cfg.get("redirect_uri") or os.environ.get("FYERS_REDIRECT_URI", "https://trade.fyers.in/api-login/redirect-uri/index.html")).strip()
+        "client_id": (cfg.get("client_id") or os.environ.get("client_id", "")).strip(),
+        "secret_key": (cfg.get("secret_key") or os.environ.get("secret_key", "")).strip(),
+        "fy_id": (cfg.get("fy_id") or os.environ.get("fy_id", "")).strip(),
+        "pin": (cfg.get("pin") or os.environ.get("pin", "")).strip(),
+        "totp_key": (cfg.get("totp_key") or os.environ.get("totp_key", "")).strip().replace(" ", ""),
+        "redirect_uri": (cfg.get("redirect_uri") or os.environ.get("redirect_uri", "https://trade.fyers.in/api-login/redirect-uri/index.html")).strip()
     }
 
 def auto_generate_token(force_fresh=False):

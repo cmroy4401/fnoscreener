@@ -256,7 +256,7 @@ async def market_worker():
                     logging.warning(f"Send error: {e}")
                     connected_clients.discard(ws)
 
-        await asyncio.sleep(2)
+        await asyncio.sleep(10)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

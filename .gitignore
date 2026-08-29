@@ -1,5 +1,4 @@
 fyers_config.json
-access_token.txt
 *.log
 __pycache__/
 .env

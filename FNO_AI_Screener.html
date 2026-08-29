@@ -18,9 +18,17 @@ body { margin:0; background:#0b1020; color:#eef2ff; font:13px -apple-system,Blin
 .badge-status.wait { background:rgba(255,209,102,0.15); color:#FFD166; border:1px solid #FFD166; }
 .badge-status.bad { background:rgba(255,23,68,0.15); color:#FF1744; border:1px solid #FF1744; }
 
+.login-screen { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:#0b1020; z-index:1000; flex-direction:column; justify-content:center; align-items:center; padding:20px; }
+.login-screen.active { display:flex; }
+.login-box { background:#121a2e; border:1px solid #26324b; border-radius:15px; padding:30px; max-width:400px; text-align:center; }
+.login-box h2 { color:#38bdf8; margin-bottom:20px; }
+.login-box p { color:#8d99b5; margin:15px 0; font-size:13px; line-height:1.6; }
+.login-btn { background:#2563eb; color:#fff; border:none; padding:12px 24px; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer; margin-top:20px; width:100%; }
+.login-btn:hover { background:#1d4ed8; }
+.logout-btn { background:#ff1744; color:#fff; border:none; padding:6px 12px; border-radius:6px; font-size:11px; cursor:pointer; }
+
 .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
-.grid-4 { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
 .card { background:#121a2e; border:1px solid #26324b; border-radius:10px; padding:10px; margin-bottom:10px; }
 .label { color:#8d99b5; font-size:11px; text-transform:uppercase; font-weight:600; }
 .big { font-size:16px; font-weight:800; margin:2px 0; }
@@ -31,7 +39,6 @@ body { margin:0; background:#0b1020; color:#eef2ff; font:13px -apple-system,Blin
 .tab-pane.active { display:block; }
 @keyframes fadeIn { from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:translateY(0)} }
 
-/* Compact Tables */
 .table-wrap { max-height:420px; overflow-y:auto; overflow-x:auto; border:1px solid #26324b; border-radius:8px; margin-top:6px; }
 table { width:100%; border-collapse:collapse; font-size:12px; }
 th, td { padding:8px 6px; text-align:left; border-bottom:1px solid #1f2a40; white-space:nowrap; }
@@ -41,24 +48,36 @@ th { position:sticky; top:0; background:#18233c; color:#8d99b5; font-size:11px; 
 .sell { background:#42202a; color:#ff8290; border:1px solid #732a39; }
 .wait { background:#443717; color:#ffd66b; border:1px solid #735a1f; }
 
-.toolbar { display:flex; gap:6px; margin:8px 0; }
-input, select, button { padding:8px 10px; border-radius:8px; border:1px solid #34435f; background:#0f1729; color:#eef2ff; font-size:12px; }
-input { flex:1; }
-button { background:#2563eb; border:0; font-weight:bold; cursor:pointer; }
-
-/* Fixed Bottom Mobile App Navbar */
 .bottom-nav { position:fixed; bottom:0; left:0; right:0; height:60px; background:#0f172a; border-top:1px solid #1e293b; display:flex; justify-content:space-around; align-items:center; z-index:999; }
-.nav-item { display:flex; flex-direction:column; align-items:center; justify-content:center; color:#64748b; font-size:10px; font-weight:700; gap:3px; background:none; border:none; padding:6px; flex:1; height:100%; }
+.nav-item { display:flex; flex-direction:column; align-items:center; justify-content:center; color:#64748b; font-size:10px; font-weight:700; gap:3px; background:none; border:none; padding:6px; flex:1; height:100%; cursor:pointer; }
 .nav-item.active { color:#38bdf8; }
 .nav-icon { font-size:18px; }
+
+.header-actions { display:flex; gap:8px; align-items:center; }
 </style>
 </head>
 <body>
 
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="login-screen active">
+  <div class="login-box">
+    <h2>⚡ FNO AI SCREENER</h2>
+    <p>Real-time F&O Trading Signals with SMC/ICT</p>
+    <p style="font-size:12px; color:#a0aec0; margin:20px 0;">Login with your Fyers account to get started</p>
+    <button class="login-btn" onclick="startLogin()">🔐 Login with Fyers</button>
+    <p style="font-size:11px; margin-top:20px; color:#64748b;">Your data stays private. No data shared with third parties.</p>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appScreen" style="display:none">
 <!-- TOP STICKY HEADER -->
 <div class="header">
   <div class="header-title">⚡ FNO AI LIVE</div>
-  <div id="status" class="badge-status wait">CONNECTING…</div>
+  <div class="header-actions">
+    <div id="status" class="badge-status wait">CONNECTING…</div>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
 </div>
 
 <!-- TAB 1: INDICES & SUMMARY -->
@@ -85,127 +104,76 @@ button { background:#2563eb; border:0; font-weight:bold; cursor:pointer; }
 <div id="tab-candidates" class="tab-pane">
   <div style="font-weight:800; color:#38bdf8; margin-bottom:8px">🎯 High Probability Options (ITM)</div>
   
-  <!-- NIFTY OPTIONS -->
   <div class="card">
     <div style="font-weight:700; color:#e2e8f0; margin-bottom:6px">NIFTY 50 (Spot: <span id="idxNiftyLtp">—</span> | <span id="idxNiftySignal">WAIT</span>)</div>
     <div class="grid-2">
       <div style="border-right:1px solid #26324b; padding-right:6px">
         <div class="label g">CALL (CE) • <span id="niftyCeStrike">—</span></div>
         <div class="big g" id="niftyCeStatus">WAIT</div>
-        <div class="sub-label">Entry: <b id="niftyCeEntry">—</b></div>
-        <div class="sub-label">SL: <span class="r" id="niftyCeSL">—</span> | Tgt: <span class="g" id="niftyCeTargets">—</span></div>
       </div>
       <div style="padding-left:4px">
         <div class="label r">PUT (PE) • <span id="niftyPeStrike">—</span></div>
         <div class="big r" id="niftyPeStatus">WAIT</div>
-        <div class="sub-label">Entry: <b id="niftyPeEntry">—</b></div>
-        <div class="sub-label">SL: <span class="r" id="niftyPeSL">—</span> | Tgt: <span class="g" id="niftyPeTargets">—</span></div>
       </div>
     </div>
   </div>
 
-  <!-- BANKNIFTY OPTIONS -->
   <div class="card">
-    <div style="font-weight:700; color:#e2e8f0; margin-bottom:6px">BANK NIFTY (Spot: <span id="idxBankniftyLtp">—</span> | <span id="idxBankniftySignal">WAIT</span>)</div>
+    <div style="font-weight:700; color:#e2e8f0; margin-bottom:6px">BANK NIFTY (Spot: <span id="idxBankLtp">—</span> | <span id="idxBankSignal">WAIT</span>)</div>
     <div class="grid-2">
       <div style="border-right:1px solid #26324b; padding-right:6px">
-        <div class="label g">CALL (CE) • <span id="bankniftyCeStrike">—</span></div>
-        <div class="big g" id="bankniftyCeStatus">WAIT</div>
-        <div class="sub-label">Entry: <b id="bankniftyCeEntry">—</b></div>
-        <div class="sub-label">SL: <span class="r" id="bankniftyCeSL">—</span> | Tgt: <span class="g" id="bankniftyCeTargets">—</span></div>
+        <div class="label g">CALL (CE) • <span id="bankCeStrike">—</span></div>
+        <div class="big g" id="bankCeStatus">WAIT</div>
       </div>
       <div style="padding-left:4px">
-        <div class="label r">PUT (PE) • <span id="bankniftyPeStrike">—</span></div>
-        <div class="big r" id="bankniftyPeStatus">WAIT</div>
-        <div class="sub-label">Entry: <b id="bankniftyPeEntry">—</b></div>
-        <div class="sub-label">SL: <span class="r" id="bankniftyPeSL">—</span> | Tgt: <span class="g" id="bankniftyPeTargets">—</span></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- SENSEX OPTIONS -->
-  <div class="card">
-    <div style="font-weight:700; color:#e2e8f0; margin-bottom:6px">SENSEX (Spot: <span id="idxSensexLtp">—</span> | <span id="idxSensexSignal">WAIT</span>)</div>
-    <div class="grid-2">
-      <div style="border-right:1px solid #26324b; padding-right:6px">
-        <div class="label g">CALL (CE) • <span id="sensexCeStrike">—</span></div>
-        <div class="big g" id="sensexCeStatus">WAIT</div>
-        <div class="sub-label">Entry: <b id="sensexCeEntry">—</b></div>
-        <div class="sub-label">SL: <span class="r" id="sensexCeSL">—</span> | Tgt: <span class="g" id="sensexCeTargets">—</span></div>
-      </div>
-      <div style="padding-left:4px">
-        <div class="label r">PUT (PE) • <span id="sensexPeStrike">—</span></div>
-        <div class="big r" id="sensexPeStatus">WAIT</div>
-        <div class="sub-label">Entry: <b id="sensexPeEntry">—</b></div>
-        <div class="sub-label">SL: <span class="r" id="sensexPeSL">—</span> | Tgt: <span class="g" id="sensexPeTargets">—</span></div>
+        <div class="label r">PUT (PE) • <span id="bankPeStrike">—</span></div>
+        <div class="big r" id="bankPeStatus">WAIT</div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- TAB 3: SIGNALS (SMC + ICT) -->
+<!-- TAB 3: ALL STOCKS SIGNALS -->
 <div id="tab-signals" class="tab-pane">
-  <div class="grid-3" style="margin-bottom:8px">
-    <div class="card" style="margin:0; text-align:center"><div class="label">BUY (≥65)</div><div class="big g" id="buySignals">0</div></div>
-    <div class="card" style="margin:0; text-align:center"><div class="label">SELL (≥65)</div><div class="big r" id="sellSignals">0</div></div>
-    <div class="card" style="margin:0; text-align:center"><div class="label">TOP SIGNAL</div><div class="big" id="topSignal" style="font-size:13px">WAIT</div></div>
-  </div>
-
+  <div class="label" style="margin-bottom:8px">📊 All F&O Stocks - Live Signals</div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Stock</th><th>Score</th><th>SMC</th><th>ICT</th><th>Signal</th><th>Evidence</th></tr></thead>
-      <tbody id="signalRows"><tr><td colspan="6">Syncing live signals…</td></tr></tbody>
+      <thead>
+        <tr>
+          <th>Stock</th><th>%</th><th>Vol</th><th>Score</th><th>Signal</th>
+        </tr>
+      </thead>
+      <tbody id="signalRows"></tbody>
     </table>
   </div>
 </div>
 
-<!-- TAB 4: MARKET MOVERS -->
+<!-- TAB 4: TOP MOVERS -->
 <div id="tab-movers" class="tab-pane">
-  <div class="toolbar">
-    <input id="q" placeholder="Search stock..." oninput="renderLiveStocks()">
-    <select id="setup" onchange="renderLiveStocks()"><option value="">All Setups</option><option>BUY</option><option>SELL</option><option>WAIT</option></select>
-  </div>
-  
-  <div class="card">
-    <div class="label" style="margin-bottom:4px">Top Movers (Large & Mid Cap)</div>
-    <div class="grid-2">
-      <div>
-        <div class="label g">🟢 Gainers</div>
-        <table style="font-size:11px"><tbody id="largeGainers"></tbody></table>
-      </div>
-      <div>
-        <div class="label r">🔴 Losers</div>
-        <table style="font-size:11px"><tbody id="largeLosers"></tbody></table>
-      </div>
+  <div class="label" style="margin-bottom:8px">📈 Top Gainers & Losers</div>
+  <div class="grid-2">
+    <div>
+      <div class="label g" style="margin-bottom:6px">🟢 TOP GAINERS</div>
+      <div id="gainersTable"></div>
+    </div>
+    <div>
+      <div class="label r" style="margin-bottom:6px">🔴 TOP LOSERS</div>
+      <div id="losersTable"></div>
     </div>
   </div>
-
-  <div class="label" style="margin:8px 0 4px 0">All F&O Stocks (Sorted by Volume)</div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Stock</th><th>%</th><th>Vol</th><th>Score</th><th>Setup</th></tr></thead>
-      <tbody id="rows"></tbody>
-    </table>
-  </div>
 </div>
 
-<!-- TAB 5: JOURNALS -->
+<!-- TAB 5: JOURNAL -->
 <div id="tab-journal" class="tab-pane">
-  <div class="label">Index Options Journal (Live Executions)</div>
-  <div class="table-wrap" style="max-height:220px">
-    <table>
-      <thead><tr><th>Time</th><th>Index</th><th>Side</th><th>Strike</th><th>Entry</th><th>SL</th><th>Targets</th></tr></thead>
-      <tbody id="indexOptionJournalRows"></tbody>
-    </table>
-  </div>
-  
-  <div class="label" style="margin-top:12px">Stock Signals Backtest Journal</div>
+  <div class="label" style="margin-bottom:8px">📋 Signal Journal</div>
   <div class="table-wrap" style="max-height:220px">
     <table>
       <thead><tr><th>Time</th><th>Stock</th><th>Side</th><th>Score</th><th>Entry</th></tr></thead>
       <tbody id="journalRows"></tbody>
     </table>
   </div>
+</div>
+
 </div>
 
 <!-- FIXED BOTTOM NAVIGATION BAR -->
@@ -228,10 +196,45 @@ function switchTab(tabId) {
 }
 
 let LIVE_STOCKS=[], LIVE_DATA={}, LIVE_CANDIDATES={}, LIVE_INDEX_SIGNALS={}, LIVE_INDEX_OPTION_JOURNAL=[];
+let ws = null;
 
 function fmt(n){if(n==null||n==='')return '—';let v=Number(n);return Number.isFinite(v)?v.toLocaleString('en-IN',{maximumFractionDigits:2}):String(n)}
 function pct(n){let v=Number(n);return Number.isFinite(v)?(v>=0?'+':'')+v.toFixed(2)+'%':'—'}
 function cc(n){return Number(n)>0?'g':Number(n)<0?'r':'y'}
+
+async function checkAuth() {
+  try {
+    let r = await fetch('/api/status');
+    let data = await r.json();
+    return data.authenticated;
+  } catch(e) {
+    console.error('Auth check failed:', e);
+    return false;
+  }
+}
+
+async function startLogin() {
+  try {
+    let r = await fetch('/api/login');
+    let data = await r.json();
+    if(data.auth_url) {
+      window.location.href = data.auth_url;
+    }
+  } catch(e) {
+    alert('Login failed: ' + e);
+  }
+}
+
+async function logout() {
+  if(confirm('Logout?')) {
+    try {
+      await fetch('/api/logout', {method: 'POST'});
+      location.reload();
+    } catch(e) {
+      console.error('Logout failed:', e);
+    }
+  }
+}
 
 function renderIndices(){
   const order=[
@@ -248,171 +251,113 @@ function renderIndices(){
   }).join('');
 }
 
-function renderHeatmap(){
-  let el=document.getElementById('liveHeatmap');
-  if(!el)return;
-  let g={};
-  LIVE_STOCKS.forEach(x=>(g[x[1]]??=[]).push(Number(x[2])||0));
-  let rows=Object.entries(g).map(([s,a])=>{let avg=a.reduce((p,c)=>p+c,0)/a.length;return [s,avg,Math.max(0,Math.min(100,Math.round(50+avg*15))) ]}).sort((a,b)=>b[2]-a[2]);
-  el.innerHTML=rows.slice(0,6).map(x=>`<div class="card ${x[1]>0?'g':x[1]<0?'r':'y'}" style="margin:0; padding:6px 8px"><b>${x[0]}</b> <span style="float:right">${pct(x[1])}</span></div>`).join('');
-}
-
-function renderLiveSignalPanel(){
-  let buy=LIVE_STOCKS.filter(x=>x[12]==='BUY' && Number(x[6])>=65),
-      sell=LIVE_STOCKS.filter(x=>x[12]==='SELL' && Number(x[6])>=65);
-  document.getElementById('buySignals').textContent=buy.length;
-  document.getElementById('sellSignals').textContent=sell.length;
-  
-  let ranked=[...LIVE_STOCKS].sort((a,b)=>(Number(b[9])||0)-(Number(a[9])||0));
-  let top=ranked.find(x=>Number(x[6])>=65 && (x[12]==='BUY'||x[12]==='SELL'));
-  let t=document.getElementById('topSignal');
-  t.textContent=top?`${top[0]} ${top[12]}`:'WAIT';
-  t.className=top?`big ${top[12]==='BUY'?'g':'r'}`:'big y';
-  
-  document.getElementById('signalRows').innerHTML=ranked.slice(0,50).map(x=>{
-    let score=Number(x[6])||0;
-    let sig=(score>=65 && (x[12]==='BUY'||x[12]==='SELL'))?x[12]:'WAIT';
-    let bClass=sig==='BUY'?'buy':sig==='SELL'?'sell':'wait';
-    return `<tr><td><b>${x[0]}</b></td><td>${score}</td><td>${x[5]}</td><td>${x[13]}</td><td><span class="badge ${bClass}">${sig}</span></td><td style="font-size:11px">${x[14]||'-'}</td></tr>`;
-  }).join('')||'<tr><td colspan="6">Syncing data…</td></tr>';
-}
-
-function renderLiveStocks(){
-  let q=(document.getElementById('q')?.value||'').toLowerCase(),
-      u=document.getElementById('setup')?.value||'';
-
-  let a=LIVE_STOCKS.filter(x=>(!q||x[0].toLowerCase().includes(q))&&(!u||x[7]===u));
-  a.sort((x,y)=>(Number(y[9])||0)-(Number(x[9])||0));
-
-  const mini = x => `<tr><td><b>${x[0]}</b></td><td class="${x[2]>=0?'g':'r'}">${pct(x[2])}</td><td>${x[6]}</td></tr>`;
-  document.getElementById('largeGainers').innerHTML=a.filter(x=>Number(x[2])>=0).slice(0,4).map(mini).join('')||'<tr><td>—</td></tr>';
-  document.getElementById('largeLosers').innerHTML=a.filter(x=>Number(x[2])<0).sort((x,y)=>Number(x[2])-Number(y[2])).slice(0,4).map(mini).join('')||'<tr><td>—</td></tr>';
-  
-  document.getElementById('rows').innerHTML=a.map(x=>{
-    let score = Number(x[6])||0;
-    let sig = (score>=65 && (x[7]==='BUY'||x[7]==='SELL')) ? x[7] : 'WAIT';
-    let bClass = sig==='BUY'?'buy':sig==='SELL'?'sell':'wait';
-    return `<tr><td><b>${x[0]}</b></td><td class="${x[2]>=0?'g':'r'}">${pct(x[2])}</td><td>${x[4]}</td><td>${score}</td><td><span class="badge ${bClass}">${sig}</span></td></tr>`;
-  }).join('')||'<tr><td colspan="5">Loading F&O stocks…</td></tr>';
-  
-  renderHeatmap();
-}
-
-function renderCandidates(){
-  const indices=['nifty','banknifty','sensex'];
-  const indexKeys={nifty:'NIFTY',banknifty:'BANKNIFTY',sensex:'SENSEX'};
-  indices.forEach(prefix=>{
-    const idxData=LIVE_CANDIDATES[indexKeys[prefix]]||{};
-    ['Ce','Pe'].forEach(sideKey=>{
-      const sideCode=sideKey==='Ce'?'CE':'PE';
-      const c=idxData[sideCode];
-      const statusEl=document.getElementById(prefix+sideKey+'Status');
-      if(!statusEl)return;
-      if(!c){
-        statusEl.textContent='WAIT';statusEl.className='big y';
-        document.getElementById(prefix+sideKey+'Strike').textContent='—';
-        document.getElementById(prefix+sideKey+'Entry').textContent='—';
-        document.getElementById(prefix+sideKey+'SL').textContent='—';
-        document.getElementById(prefix+sideKey+'Targets').textContent='—';
-        return;
-      }
-      const sig=c.final_signal||'WAIT';
-      statusEl.textContent=sig;
-      statusEl.className='big '+(sig==='BUY'?'g':sig==='SELL'?'r':'y');
-      document.getElementById(prefix+sideKey+'Strike').textContent=c.strike+' '+sideCode;
-      document.getElementById(prefix+sideKey+'Entry').textContent='₹'+c.entry;
-      document.getElementById(prefix+sideKey+'SL').textContent='₹'+c.stop_loss;
-      document.getElementById(prefix+sideKey+'Targets').textContent='₹'+c.targets;
-    });
-  });
-}
-
-function renderIndexSignals(){
-  const blocks={NIFTY:'idxNifty',BANKNIFTY:'idxBanknifty',SENSEX:'idxSensex'};
-  Object.entries(blocks).forEach(([name,prefix])=>{
-    const s=LIVE_INDEX_SIGNALS[name];
-    const ltpEl=document.getElementById(prefix+'Ltp');
-    if(!ltpEl)return;
-    if(s){
-      ltpEl.textContent=fmt(s.ltp);
-      document.getElementById(prefix+'Signal').textContent=s.final_signal;
-      document.getElementById(prefix+'Signal').className=(s.final_signal==='BUY'?'g':s.final_signal==='SELL'?'r':'y');
-    }
-  });
-}
-
-function renderCombinedSignals(){
-  const map={NIFTY:'niftyCombined',BANKNIFTY:'bankniftyCombined',SENSEX:'sensexCombined'};
-  Object.entries(map).forEach(([name,elId])=>{
-    const el=document.getElementById(elId);
-    if(!el)return;
-    const idxSig=LIVE_INDEX_SIGNALS[name];
-    const cand=LIVE_CANDIDATES[name]||{};
-    let status='WAIT',cls='y';
-    if(idxSig && idxSig.final_signal==='BUY' && cand.CE && cand.CE.final_signal==='BUY'){ status='BUY';cls='g'; }
-    else if(idxSig && idxSig.final_signal==='SELL' && cand.PE && cand.PE.final_signal==='BUY'){ status='SELL';cls='r'; }
-    el.textContent=status;
-    el.className='big '+cls;
-  });
-}
-
-function renderIndexOptionJournal(){
-  const el=document.getElementById('indexOptionJournalRows');
-  if(!el)return;
-  if(!LIVE_INDEX_OPTION_JOURNAL.length){
-    el.innerHTML='<tr><td colspan="7" style="color:#8d99b5">No confirmed options logged yet</td></tr>';
-    return;
-  }
-  el.innerHTML=[...LIVE_INDEX_OPTION_JOURNAL].reverse().slice(0,10).map(s=>{
-    const dt=new Date(s.timestamp*1000).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-    return `<tr><td>${dt}</td><td><b>${s.index}</b></td><td>${s.side}</td><td>${s.strike}</td><td>₹${s.entry}</td><td class="r">₹${s.stop_loss}</td><td class="g">₹${s.targets}</td></tr>`;
+function renderSignals(){
+  let tbody = document.getElementById('signalRows');
+  if(!tbody || !LIVE_STOCKS.length) return;
+  tbody.innerHTML = LIVE_STOCKS.slice(0, 30).map((row, idx) => {
+    let [ticker, sector, chg, ltp, vol, smc, score, sig] = row;
+    return `<tr>
+      <td>${ticker}</td>
+      <td class="${cc(chg)}">${pct(chg)}</td>
+      <td>${vol}</td>
+      <td>${score}</td>
+      <td><span class="badge ${sig.toLowerCase()}">${sig}</span></td>
+    </tr>`;
   }).join('');
 }
 
-function connectLiveBridge(){
-  let proto=location.protocol==='https:'?'wss':'ws';
-  let ws=new WebSocket(`${proto}://${location.host}/ws`);
-  ws.onopen=()=>{
-    let st=document.getElementById('status');
-    if(st){ st.textContent='● LIVE'; st.className='badge-status live'; }
+function renderMovers(){
+  if(!LIVE_STOCKS.length) return;
+  let sorted = [...LIVE_STOCKS].sort((a,b) => Number(b[2]) - Number(a[2]));
+  let gainers = sorted.slice(0, 4).map(row => `<div style="padding:6px; border-bottom:1px solid #26324b"><b>${row[0]}</b> <span class="g">${pct(row[2])}</span></div>`).join('');
+  let losers = sorted.slice(-4).reverse().map(row => `<div style="padding:6px; border-bottom:1px solid #26324b"><b>${row[0]}</b> <span class="r">${pct(row[2])}</span></div>`).join('');
+  
+  document.getElementById('gainersTable').innerHTML = gainers;
+  document.getElementById('losersTable').innerHTML = losers;
+}
+
+async function initApp() {
+  // Check auth first
+  let auth = await checkAuth();
+  if(!auth) {
+    document.getElementById('appScreen').style.display = 'none';
+    document.getElementById('loginScreen').classList.add('active');
+    return;
+  }
+  
+  // Show app
+  document.getElementById('appScreen').style.display = 'block';
+  document.getElementById('loginScreen').classList.remove('active');
+  
+  // Connect WebSocket
+  connectWebSocket();
+}
+
+function connectWebSocket() {
+  let proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  let url = `${proto}://${location.host}/ws`;
+  
+  ws = new WebSocket(url);
+  
+  ws.onopen = () => {
+    console.log('✓ WebSocket connected');
+    updateStatus('LIVE');
   };
-  ws.onmessage=ev=>{
-    try{
-      let p=JSON.parse(ev.data);
-      LIVE_STOCKS=p.stocks||[];
-      LIVE_DATA=p.data||{};
-      LIVE_CANDIDATES=p.candidates||{};
-      LIVE_INDEX_SIGNALS=p.index_signals||{};
-      LIVE_INDEX_OPTION_JOURNAL=p.index_option_journal||[];
+  
+  ws.onmessage = (e) => {
+    try {
+      let data = JSON.parse(e.data);
+      LIVE_STOCKS = data.stocks || [];
+      LIVE_DATA = data.data || {};
+      LIVE_CANDIDATES = data.candidates || {};
+      LIVE_INDEX_SIGNALS = data.index_signals || {};
+      
       renderIndices();
-      renderLiveStocks();
-      renderLiveSignalPanel();
-      renderIndexSignals();
-      renderCandidates();
-      renderIndexOptionJournal();
-      renderCombinedSignals();
-    }catch(e){}
+      renderSignals();
+      renderMovers();
+    } catch(err) {
+      console.error('Parse error:', err);
+    }
   };
-  ws.onclose=()=>{
-    let st=document.getElementById('status');
-    if(st){ st.textContent='● OFFLINE'; st.className='badge-status bad'; }
-    setTimeout(connectLiveBridge,3000);
+  
+  ws.onclose = () => {
+    updateStatus('OFFLINE');
+    setTimeout(connectWebSocket, 3000);
+  };
+  
+  ws.onerror = (e) => {
+    updateStatus('ERROR');
+    console.error('WebSocket error:', e);
   };
 }
 
-async function loadJournal(){
-  try{
-    const res=await fetch('/journal');
-    const j=await res.json();
-    const rows=j.signals||[];
-    document.getElementById('journalRows').innerHTML=rows.slice(-15).reverse().map(x=>`<tr><td>${new Date(Number(x.timestamp)*1000).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</td><td><b>${x.name||x.symbol}</b></td><td class="${x.side==='BUY'?'g':'r'}">${x.side}</td><td>${x.score}</td><td>${fmt(x.entry)}</td></tr>`).join('')||'<tr><td colspan="5">No saved signals</td></tr>';
-  }catch(e){}
+function updateStatus(status) {
+  let el = document.getElementById('status');
+  if(!el) return;
+  el.classList.remove('live', 'wait', 'bad');
+  
+  if(status === 'LIVE') {
+    el.textContent = '● LIVE';
+    el.classList.add('live');
+  } else if(status === 'OFFLINE') {
+    el.textContent = '● OFFLINE';
+    el.classList.add('bad');
+  } else {
+    el.textContent = '● ' + status;
+    el.classList.add('wait');
+  }
 }
 
-window.addEventListener('load',()=>{
-  connectLiveBridge();
-  loadJournal();
+// Init on load
+window.addEventListener('load', initApp);
+
+// Reconnect on visibility change
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
+    connectWebSocket();
+  }
 });
 </script>
+
 </body>
 </html>

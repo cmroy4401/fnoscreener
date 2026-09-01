@@ -1,7 +1,0 @@
-fyers_config.json
-*.log
-__pycache__/
-.env
-*.db
-.DS_Store
-*.pyc

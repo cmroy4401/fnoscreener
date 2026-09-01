@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRO TRADER - Custom Terminal</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;700;800;900&display=swap');
+        body { background-color: #09090b; color: #f8fafc; font-family: 'Inter', sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
+        
+        .header { display: flex; flex-direction: column; gap: 8px; background: linear-gradient(90deg, #18181b, #09090b); padding: 12px 20px; border-radius: 10px; border: 1px solid #27272a; margin-bottom: 12px; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .header h1 { margin: 0; font-size: 20px; font-weight: 800; } .header h1 span { color: #3b82f6; } 
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        
+        @keyframes feedBlinkPulse {
+            0% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px #10b981; }
+            50% { opacity: 0.3; transform: scale(0.85); box-shadow: 0 0 1px #10b981; }
+            100% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px #10b981; }
+        }
+        @keyframes feedAmberPulse {
+            0% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px #f59e0b; }
+            50% { opacity: 0.3; transform: scale(0.85); box-shadow: 0 0 1px #f59e0b; }
+            100% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px #f59e0b; }
+        }
+
+        .live-pulse { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+        .dot { height: 9px; width: 9px; border-radius: 50%; display: inline-block; background-color: #10b981; animation: feedBlinkPulse 1.2s infinite ease-in-out; }
+        .is-live { color: #10b981; text-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; margin-bottom: 6px; padding: 0 2px; }
+        .section-title { font-size: 11.5px; color: #a1a1aa; text-transform: uppercase; font-weight: 800; letter-spacing: 0.8px; margin: 0; }
+        .live-tag { font-size: 9px; font-family: 'JetBrains Mono', monospace; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #38bdf8; border: 1px solid #38bdf8; padding: 1px 5px; border-radius: 4px; }
+        
+        .top-indices-row { display: flex; justify-content: space-between; gap: 6px; width: 100%; flex-wrap: wrap; }
+        .index-box { flex: 1; min-width: 105px; background-color: #18181b; border: 1px solid #27272a; border-top: 2px solid #3b82f6; border-radius: 6px; padding: 6px 3px; text-align: center; }
+        .global-box { border-top: 2px solid #f59e0b; } 
+        
+        .index-header-row { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 2px; }
+        .index-name { font-size: 9.5px; color: #a1a1aa; text-transform: uppercase; font-weight: 700; }
+        
+        .mini-dot { height: 6px; width: 6px; border-radius: 50%; display: inline-block; background-color: #52525b; transition: all 0.3s ease; }
+        .mini-dot-live { background-color: #10b981 !important; animation: feedBlinkPulse 1.4s infinite ease-in-out !important; }
+        .mini-dot-futures { background-color: #f59e0b !important; animation: feedAmberPulse 1.4s infinite ease-in-out !important; }
+        .mini-dot-closed { background-color: #52525b !important; animation: none !important; }
+
+        .index-ltp { font-size: 13.5px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        .index-sub { font-size: 9.5px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+        .split-row { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; }
+        .split-label { font-size: 9px; color: #a1a1aa; font-weight: bold; }
+        .split-ltp { font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        .split-sub { font-size: 8px; font-family: 'JetBrains Mono', monospace; }
+        .split-line { border-bottom: 1px solid #27272a; margin: 2px 0; }
+
+        .ticker-wrap { width: 100%; background-color: #18181b; border: 1px solid #27272a; border-radius: 6px; overflow: hidden; white-space: nowrap; padding: 6px 0; margin-top: 10px; }
+        .ticker-move { display: inline-block; white-space: nowrap; animation: ticker 25s linear infinite; }
+        .ticker-item { display: inline-block; padding: 0 16px; font-size: 11.5px; border-right: 1px solid #334155; }
+        .ticker-name { color: #a1a1aa; margin-right: 4px; font-weight: 700;}
+        .ticker-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+        @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+        .heatmap-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; width: 100%; }
+        @media (min-width: 850px) { .heatmap-grid { grid-template-columns: repeat(12, 1fr); gap: 5px; } }
+
+        .heat-tile { border-radius: 5px; padding: 4px 2px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; min-height: 44px; box-sizing: border-box; cursor: pointer; transition: all 0.2s ease; }
+        .heat-tile:hover { transform: translateY(-1px); }
+        .heat-tile.active-sector { outline: 2px solid #38bdf8; box-shadow: 0 0 10px rgba(56, 189, 248, 0.7) !important; }
+
+        .tile-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px; padding: 0 2px; }
+        .tile-name { font-size: 9px; font-weight: 800; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tile-rank { font-size: 7px; font-weight: 800; padding: 0 2px; border-radius: 2px; background: rgba(0, 0, 0, 0.4); color: #ffffff; }
+        .tile-price { font-size: 9px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: #ffffff; }
+        .tile-pct { font-size: 9px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+
+        .sec5-container { background-color: #141417; border: 1px solid #27272a; border-radius: 8px; padding: 8px 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .radar-bar { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 6px; border-bottom: 1px solid #27272a; }
+        .radar-pill { font-size: 8.5px; font-weight: 800; padding: 2px 5px; border-radius: 3px; white-space: nowrap; cursor: pointer; font-family: 'JetBrains Mono', monospace; background: #18181b; border: 1px solid #27272a; }
+        .radar-pill.active { border-color: #38bdf8; background: #27272a; }
+
+        .sec5-top-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+        .sector-active-badge { font-size: 10.5px; font-weight: 800; color: #a1a1aa; display: flex; align-items: center; gap: 4px; }
+        .sector-active-badge span { background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 1px 5px; border-radius: 3px; border: 1px solid #38bdf8; }
+
+        .breadth-meter-box { display: flex; align-items: center; gap: 5px; font-size: 9.5px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        .breadth-bar { width: 50px; height: 5px; background: #ef4444; border-radius: 2px; overflow: hidden; display: flex; }
+        .breadth-fill-green { background: #10b981; height: 100%; }
+
+        .verdict-banner { width: 100%; padding: 4px 6px; border-radius: 4px; font-size: 9.5px; font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 6px; font-family: 'JetBrains Mono', monospace; box-sizing: border-box; }
+        .verdict-strong-bull { background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #34d399; }
+        .verdict-strong-bear { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #f87171; }
+        .verdict-trap { background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #fbbf24; }
+
+        .table-responsive { width: 100%; overflow-x: auto; }
+        .sec5-table { width: 100%; border-collapse: collapse; font-size: 10.5px; text-align: left; }
+        .sec5-table th { color: #71717a; text-transform: uppercase; font-size: 8px; font-weight: 800; padding: 4px; border-bottom: 1px solid #27272a; }
+        .sec5-table td { padding: 5px 4px; border-bottom: 1px solid #1c1917; font-family: 'JetBrains Mono', monospace; }
+        .sec5-table tr:last-child td { border-bottom: none; }
+
+        .stock-name-cell { font-family: 'Inter', sans-serif !important; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 3px; }
+        .weight-tag { font-size: 7px; font-weight: 700; background: #27272a; color: #a1a1aa; padding: 1px 3px; border-radius: 2px; }
+
+        .pill-signal { font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 3px; display: inline-block; white-space: nowrap; }
+        .sig-buy { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+        .sig-sell { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+        .sig-neutral { background: rgba(113, 113, 122, 0.2); color: #a1a1aa; border: 1px solid #52525b; }
+
+        .queue-container { background: #18181b; border: 1px solid #27272a; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; }
+        .queue-header { display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 800; color: #a1a1aa; margin-bottom: 5px; font-family: 'JetBrains Mono', monospace; }
+        .queue-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+        @media (min-width: 850px) { .queue-grid { grid-template-columns: repeat(4, 1fr); } }
+
+        .queue-card { background: #141417; border: 1px dashed #3f3f46; border-radius: 4px; padding: 4px 6px; display: flex; flex-direction: column; gap: 2px; font-family: 'JetBrains Mono', monospace; }
+        .queue-top { display: flex; justify-content: space-between; align-items: center; }
+        .queue-name { font-size: 10.5px; font-weight: 800; color: #ffffff; }
+        .queue-rank { font-size: 7.5px; font-weight: 800; padding: 1px 4px; border-radius: 2px; background: #27272a; color: #fbbf24; }
+        .queue-score { font-size: 8.5px; font-weight: 700; color: #38bdf8; }
+        .queue-status { font-size: 7.5px; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .sec6-grid { display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; }
+        @media (min-width: 850px) { .sec6-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; } }
+        @media (min-width: 1200px) { .sec6-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; } }
+
+        .signal-card { background-color: #141417; border: 1px solid #27272a; border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.4); transition: background 0.3s ease, border-color 0.3s ease; position: relative; overflow: hidden; }
+        .card-bullish { border-top: 3.5px solid #10b981; }
+        .card-bearish { border-top: 3.5px solid #ef4444; }
+
+        .priority-strip { display: flex; justify-content: space-between; align-items: center; font-size: 8px; font-weight: 900; padding: 2px 5px; border-radius: 3px; margin-bottom: 5px; font-family: 'JetBrains Mono', monospace; }
+        .priority-p1 { background: rgba(251, 191, 36, 0.15); border: 1px solid #fbbf24; color: #fbbf24; }
+        .priority-p2 { background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8; }
+        .priority-p3 { background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #34d399; }
+        .priority-p4 { background: rgba(161, 161, 170, 0.15); border: 1px solid #71717a; color: #d4d4d8; }
+
+        @keyframes fullBoxRedPulse {
+            0% { background: linear-gradient(135deg, rgba(220, 38, 38, 0.95), rgba(127, 29, 29, 0.95)); border-color: #ffffff; box-shadow: 0 0 28px rgba(239, 68, 68, 0.95); }
+            50% { background: linear-gradient(135deg, rgba(136, 19, 19, 0.95), rgba(69, 10, 10, 0.95)); border-color: #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+            100% { background: linear-gradient(135deg, rgba(220, 38, 38, 0.95), rgba(127, 29, 29, 0.95)); border-color: #ffffff; box-shadow: 0 0 28px rgba(239, 68, 68, 0.95); }
+        }
+        .card-invalid-extreme { animation: fullBoxRedPulse 0.8s infinite alternate ease-in-out !important; border: 2px solid #ffffff !important; }
+
+        .emergency-banner-top { background: #ffffff; color: #dc2626; font-weight: 900; font-size: 8.5px; text-align: center; padding: 3px 0; border-radius: 3px; margin-bottom: 5px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px; box-shadow: 0 0 10px #ffffff; }
+
+        .card-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .stock-action-group { display: flex; align-items: center; gap: 4px; }
+        .stock-sym { font-size: 13.5px; font-weight: 900; color: #ffffff; }
+        .sec-pill { font-size: 7.5px; font-weight: 800; background: #27272a; color: #a1a1aa; padding: 1.5px 4px; border-radius: 2px; }
+        
+        .action-badge { font-size: 9px; font-weight: 900; padding: 2px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; }
+        .action-ce { background: #059669; color: #ffffff; }
+        .action-pe { background: #dc2626; color: #ffffff; }
+        .action-extreme-exit { background: #ffffff !important; color: #dc2626 !important; font-weight: 900 !important; font-size: 9.5px !important; box-shadow: 0 0 10px rgba(255, 255, 255, 0.9) !important; }
+
+        .price-strike-box { text-align: right; font-family: 'JetBrains Mono', monospace; }
+        .opt-strike { font-size: 11px; font-weight: 900; color: #fbbf24; display: block; }
+        .stock-ltp-sub { font-size: 8px; font-weight: 700; color: #a1a1aa; }
+        .premium-text { font-size: 10.5px; font-weight: 800; color: #ffffff; margin-right: 3px; }
+
+        .confluence-row { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 5px; }
+        .smc-tag { font-size: 7px; font-weight: 700; font-family: 'JetBrains Mono', monospace; padding: 1px 4px; border-radius: 2px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; }
+        .smc-tag-extreme-alarm { background: rgba(0, 0, 0, 0.55) !important; border-color: #ffffff !important; color: #ffffff !important; font-weight: 900 !important; }
+
+        .levels-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; text-align: center; font-family: 'JetBrains Mono', monospace; background: #18181b; padding: 4px 3px; border-radius: 4px; border: 1px solid #27272a; }
+        .level-box { display: flex; flex-direction: column; gap: 1.5px; }
+        .level-lbl { font-size: 6.5px; color: #71717a; font-weight: 800; text-transform: uppercase; }
+        .level-val { font-size: 9px; font-weight: 800; color: #ffffff; }
+
+        .card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 7.5px; color: #71717a; font-family: 'JetBrains Mono', monospace; font-weight: 700; margin-top: 4px; padding-top: 3px; border-top: 1px dotted #27272a; }
+        .footer-extreme { color: #ffffff !important; font-weight: 900 !important; border-top: 1px solid rgba(255, 255, 255, 0.5) !important; }
+
+        .sec7-grid { display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; }
+        @media (min-width: 850px) { .sec7-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
+
+        .decoder-card { background: #141417; border: 1px solid #27272a; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 15px rgba(0,0,0,0.5); position: relative; }
+        .decoder-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #27272a; padding-bottom: 6px; }
+        .target-title { font-size: 13px; font-weight: 900; color: #ffffff; display: flex; align-items: center; gap: 5px; }
+        .spot-badge { font-size: 8.5px; font-weight: 800; background: #27272a; color: #a1a1aa; padding: 2px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; }
+        .sync-tag { font-size: 7.5px; font-weight: 800; font-family: 'JetBrains Mono', monospace; padding: 2px 5px; border-radius: 3px; background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8; }
+
+        .big-verdict-box { border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 2px; font-family: 'JetBrains Mono', monospace; }
+        .verdict-bullish { background: rgba(16, 185, 129, 0.15); border: 1.5px solid #10b981; color: #34d399; }
+        .verdict-trap { background: rgba(245, 158, 11, 0.15); border: 1.5px solid #f59e0b; color: #fbbf24; }
+        .verdict-bearish { background: rgba(239, 68, 68, 0.15); border: 1.5px solid #ef4444; color: #f87171; }
+
+        .verdict-headline { font-size: 10.5px; font-weight: 900; display: flex; align-items: center; gap: 5px; }
+        .verdict-reason { font-size: 8.5px; font-weight: 700; color: #d4d4d8; }
+
+        .metric-summary-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; text-align: center; font-family: 'JetBrains Mono', monospace; background: #18181b; padding: 5px 4px; border-radius: 5px; border: 1px solid #27272a; margin-bottom: 8px; }
+        .m-box { display: flex; flex-direction: column; gap: 1px; }
+        .m-lbl { font-size: 6.5px; color: #71717a; font-weight: 800; text-transform: uppercase; }
+        .m-val { font-size: 9.5px; font-weight: 900; color: #ffffff; }
+
+        .bar-container { margin-top: 4px; }
+        .bar-labels { display: flex; justify-content: space-between; font-size: 8px; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin-bottom: 2px; }
+        .oi-bar { display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: #27272a; }
+        .fill-call { background: #ef4444; }
+        .fill-put { background: #10b981; }
+
+        .green-neon { color: #34d399; } .red-neon { color: #f87171; } .white-text { color: #ffffff; }
+        .vwap-above { color: #34d399; } .vwap-below { color: #f87171; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <h1>PRO<span>TRADER</span> TERMINAL</h1>
+            <div class="header-right">
+                <div class="live-pulse is-live"><span class="dot"></span><span>FEED ACTIVE</span></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 1. INDIAN INDICES -->
+    <div class="section-header"><div class="section-title">1. INDIAN BROAD BENCHMARKS</div></div>
+    <div class="top-indices-row" id="indianContainer"></div>
+
+    <!-- 2. GLOBAL MACRO -->
+    <div class="section-header"><div class="section-title">2. GLOBAL MACRO (US FUTURES ACTIVE)</div></div>
+    <div class="top-indices-row">
+        <div class="index-box global-box">
+            <div class="index-header-row"><span class="mini-dot" id="dot-DOW"></span><span class="index-name">Dow Jones</span></div>
+            <div class="index-ltp white-text" id="ltp-DOW">--</div>
+            <div class="index-sub white-text" id="sub-DOW">--</div>
+        </div>
+        <div class="index-box global-box">
+            <div class="index-header-row"><span class="mini-dot" id="dot-NASDAQ"></span><span class="index-name">Nasdaq</span></div>
+            <div class="index-ltp white-text" id="ltp-NASDAQ">--</div>
+            <div class="index-sub white-text" id="sub-NASDAQ">--</div>
+        </div>
+        <div class="index-box global-box">
+            <div class="index-header-row"><span class="mini-dot" id="dot-NIKKEI"></span><span class="index-name">Nikkei 225</span></div>
+            <div class="index-ltp white-text" id="ltp-NIKKEI">--</div>
+            <div class="index-sub white-text" id="sub-NIKKEI">--</div>
+        </div>
+        <div class="index-box global-box">
+            <div class="index-header-row"><span class="mini-dot" id="dot-HANGSENG"></span><span class="index-name">Hang Seng</span></div>
+            <div class="index-ltp white-text" id="ltp-HANGSENG">--</div>
+            <div class="index-sub white-text" id="sub-HANGSENG">--</div>
+        </div>
+        <div class="index-box global-box" style="padding: 6px 3px;">
+            <div class="index-header-row" style="margin-bottom: 2px;"><span class="mini-dot" id="dot-OIL"></span><span class="index-name">Oil (WTI/BRN)</span></div>
+            <div class="split-row"><span class="split-label">WTI</span><div style="text-align:right;"><div class="split-ltp white-text" id="ltp-CRUDE">--</div><div class="split-sub white-text" id="sub-CRUDE">--</div></div></div>
+            <div class="split-line"></div>
+            <div class="split-row"><span class="split-label">BRN</span><div style="text-align:right;"><div class="split-ltp white-text" id="ltp-BRENT">--</div><div class="split-sub white-text" id="sub-BRENT">--</div></div></div>
+        </div>
+        <div class="index-box global-box" style="padding: 6px 3px;">
+            <div class="index-header-row" style="margin-bottom: 2px;"><span class="mini-dot" id="dot-GOLD"></span><span class="index-name">Gold (Spot/MCX)</span></div>
+            <div class="split-row"><span class="split-label">USD</span><div style="text-align:right;"><div class="split-ltp white-text" id="ltp-XAUUSD">--</div><div class="split-sub white-text" id="sub-XAUUSD">--</div></div></div>
+            <div class="split-line"></div>
+            <div class="split-row"><span class="split-label">INR</span><div style="text-align:right;"><div class="split-ltp white-text" id="ltp-GOLD_MCX">--</div><div class="split-sub white-text" id="sub-GOLD_MCX">--</div></div></div>
+        </div>
+    </div>
+
+    <!-- 3. OTHER GLOBAL MARKETS -->
+    <div class="section-header"><div class="section-title">3. OTHER GLOBAL MARKETS</div></div>
+    <div class="ticker-wrap"><div class="ticker-move" id="tickerContainer"></div></div>
+
+    <!-- 4. NSE SECTORAL HEATMAP -->
+    <div class="section-header"><div class="section-title">4. SECTOR ROTATION (> ±0.25% MOMENTUM FILTER)</div></div>
+    <div class="heatmap-grid" id="heatmapContainer"></div>
+
+    <!-- 5. SECTOR CONSTITUENTS & TOP 3 GIANTS -->
+    <div class="section-header"><div class="section-title">5. SECTOR CONSTITUENTS & TOP 3 GIANTS SYNC</div></div>
+    <div class="sec5-container">
+        <div class="radar-bar" id="radarBar"></div>
+        <div class="sec5-top-bar">
+            <div class="sector-active-badge">INSPECTING: <span id="activeSectorName">NIFTY IT</span></div>
+            <div class="breadth-meter-box">
+                <span>BREADTH:</span> <span id="breadthText" style="color: #34d399;">--</span>
+                <div class="breadth-bar"><div class="breadth-fill-green" id="breadthBarFill" style="width: 50%;"></div></div>
+            </div>
+        </div>
+        <div class="verdict-banner verdict-strong-bull" id="verdictBanner">
+            <span id="verdictText">FETCHING CONSTITUENTS...</span>
+            <span id="verdictSub">Live sync analysis</span>
+        </div>
+        <div class="table-responsive">
+            <table class="sec5-table">
+                <thead>
+                    <tr><th>Stock</th><th>LTP</th><th>Change %</th><th>VWAP Proximity</th><th>Day High/Low</th><th style="text-align: right;">Verdict</th></tr>
+                </thead>
+                <tbody id="constituentsBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 6. SMC TRIGGER -->
+    <div class="section-header">
+        <div class="section-title">6. SMC SNIPER TRIGGER (4 ACTIVE • 4 IN QUEUE)</div>
+        <div class="live-tag">👑 PRIORITY ENGINE ACTIVE</div>
+    </div>
+
+    <div class="queue-container">
+        <div class="queue-header">
+            <span>⏳ RADAR WATCH QUEUE (STAGE 1 PENDING)</span>
+            <span style="color:#38bdf8;">4 SETUPS IN RADAR</span>
+        </div>
+        <div class="queue-grid" id="queueGridContainer"></div>
+    </div>
+
+    <div class="sec6-grid" id="signalCardsContainer"></div>
+
+    <!-- 8. SECTION 8: MULTI-STRATEGY INDEX OPTIONS RADAR -->
+    <div class="section-header">
+        <div class="section-title">8. MULTI-STRATEGY INDEX OPTIONS RADAR (SETUPS 1-7 ACTIVE)</div>
+        <div class="live-tag">🎯 WATERFALL STRATEGY ENGINE</div>
+    </div>
+    <div class="sec6-grid" id="section8GridContainer"></div>
+
+    <!-- 7. INSTITUTIONAL OPTION CHAIN & OI TRAPPING RADAR -->
+    <div class="section-header">
+        <div class="section-title">7. INSTITUTIONAL OPTION CHAIN & OI TRAPPING RADAR</div>
+        <div class="live-tag">🎯 DUAL-MODE AUTO DECODER</div>
+    </div>
+
+    <div class="sec7-grid">
+        <div class="decoder-card">
+            <div>
+                <div class="decoder-top">
+                    <div class="target-title">
+                        <span>🎯 <span id="stkSym">--</span> <span id="stkOpt" style="color:#fbbf24; font-size:11px;">--</span></span>
+                        <span class="spot-badge" id="stkSpot">--</span>
+                    </div>
+                    <span class="sync-tag">SYNCED WITH #1 SETUP</span>
+                </div>
+                <div class="big-verdict-box verdict-bullish" id="stkVerdictBox">
+                    <div class="verdict-headline" id="stkVerdictTitle">🔥 SCANNING INSTITUTIONAL DATA</div>
+                    <div class="verdict-reason" id="stkVerdictDesc">Evaluating real-time option chain build-up.</div>
+                </div>
+                <div class="metric-summary-strip">
+                    <div class="m-box"><span class="m-lbl">Stock PCR</span><span class="m-val green-neon" id="stkPcr">--</span></div>
+                    <div class="m-box"><span class="m-lbl">Trap Risk</span><span class="m-val green-neon" id="stkTrapRisk">--</span></div>
+                    <div class="m-box"><span class="m-lbl">Max Pain Magnet</span><span class="m-val" id="stkMaxPain">--</span></div>
+                </div>
+            </div>
+            <div class="bar-container">
+                <div class="bar-labels">
+                    <span class="red-neon">Call Writers: <span id="stkCallPct">--%</span></span>
+                    <span class="green-neon">Put Writers (Bulls): <span id="stkPutPct">--%</span></span>
+                </div>
+                <div class="oi-bar">
+                    <div class="fill-call" id="stkCallBar" style="width: 50%;"></div>
+                    <div class="fill-put" id="stkPutBar" style="width: 50%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="decoder-card">
+            <div>
+                <div class="decoder-top">
+                    <div class="target-title">
+                        <span>🏛️ <span id="idxName">NIFTY 50</span></span>
+                        <span class="spot-badge" id="idxSpot">--</span>
+                    </div>
+                    <span class="sync-tag" id="idxSyncTag" style="border-color:#10b981; color:#34d399; background:rgba(16,185,129,0.15);">MACRO BULLISH</span>
+                </div>
+                <div class="big-verdict-box verdict-bullish" id="idxVerdictBox">
+                    <div class="verdict-headline" id="idxVerdictTitle">🟢 STRONG PUT SUPPORT BASE</div>
+                    <div class="verdict-reason" id="idxVerdictDesc">Bulls defending base levels • Institutional support active.</div>
+                </div>
+                <div class="metric-summary-strip">
+                    <div class="m-box"><span class="m-lbl">Index PCR</span><span class="m-val green-neon" id="idxPcr">--</span></div>
+                    <div class="m-box"><span class="m-lbl">Put Support Base</span><span class="m-val" style="color:#34d399;" id="idxSup">--</span></div>
+                    <div class="m-box"><span class="m-lbl">Call Resistance Wall</span><span class="m-val" style="color:#f87171;" id="idxRes">--</span></div>
+                </div>
+            </div>
+            <div class="bar-container">
+                <div class="bar-labels">
+                    <span class="red-neon">Index Call Resistance: <span id="idxCallPct">--%</span></span>
+                    <span class="green-neon">Index Put Support: <span id="idxPutPct">--%</span></span>
+                </div>
+                <div class="oi-bar">
+                    <div class="fill-call" id="idxCallBar" style="width: 50%;"></div>
+                    <div class="fill-put" id="idxPutBar" style="width: 50%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const indianList = [
+            {id: "INDIAVIX", name: "India VIX"},
+            {id: "NIFTY", name: "Nifty 50"},
+            {id: "SENSEX", name: "Sensex"},
+            {id: "BANKNIFTY", name: "Bank Nifty"},
+            {id: "MIDCPNIFTY", name: "Midcap Nifty"}
+        ];
+
+        function buildIndianBoxes() {
+            let html = "";
+            for (let item of indianList) {
+                html += `
+                <div class="index-box">
+                    <div class="index-header-row"><span class="mini-dot mini-dot-closed" id="dot-${item.id}"></span><span class="index-name">${item.name}</span></div>
+                    <div class="index-ltp white-text" id="ltp-${item.id}">--</div>
+                    <div class="index-sub white-text" id="sub-${item.id}">--</div>
+                </div>`;
+            }
+            document.getElementById('indianContainer').innerHTML = html;
+        }
+        buildIndianBoxes();
+
+        const tickerSymbols = ["FTSE", "DAX", "CAC", "KOSPI", "SHANGHAI", "SP500", "BTC"];
+        const tickerNames = {"FTSE":"FTSE (UK)", "DAX":"DAX (GER)", "CAC":"CAC (FRA)", "KOSPI":"KOSPI (SK)", "SHANGHAI":"Shanghai (CN)", "SP500":"S&P 500 (US)", "BTC":"Bitcoin"};
+        
+        function buildTicker() {
+            let html = "";
+            for(let j=0; j<2; j++) { 
+                for(let sym of tickerSymbols) {
+                    let idStr = j===0 ? `id="tick-${sym}"` : `id="tick-${sym}-dup"`;
+                    let subStr = j===0 ? `id="tsub-${sym}"` : `id="tsub-${sym}-dup"`;
+                    let dotId = j===0 ? `id="tdot-${sym}"` : `id="tdot-${sym}-dup"`;
+                    html += `<div class="ticker-item"><span class="mini-dot mini-dot-closed" ${dotId} style="margin-right:4px;"></span><span class="ticker-name">${tickerNames[sym]}</span> <span class="ticker-val white-text" ${idStr}>--</span> <span class="ticker-val" style="font-size:10px;" ${subStr}>--</span></div>`;
+                }
+            }
+            document.getElementById('tickerContainer').innerHTML = html;
+        }
+        buildTicker();
+
+        function checkMarketLive(sym) {
+            let now = new Date();
+            let day = now.getUTCDay();
+            let utcHours = now.getUTCHours() + (now.getUTCMinutes() / 60);
+            let istHours = (utcHours + 5.5) % 24;
+
+            if (sym === "BTC") return true;
+            if (day === 0 || day === 6) return false;
+
+            if (["NIFTY", "BANKNIFTY", "SENSEX", "MIDCPNIFTY", "INDIAVIX"].includes(sym)) return (istHours >= 9.25 && istHours <= 15.5);
+            if (sym === "NIKKEI") return (istHours >= 5.5 && istHours <= 11.5);
+            if (sym === "KOSPI") return (istHours >= 5.5 && istHours <= 12.0);
+            if (["HANGSENG", "SHANGHAI"].includes(sym)) return (istHours >= 7.0 && istHours <= 13.5);
+            if (["FTSE", "DAX", "CAC"].includes(sym)) return (istHours >= 13.5 && istHours <= 22.0);
+            if (["OIL", "GOLD", "CRUDE", "BRENT", "XAUUSD", "GOLD_MCX"].includes(sym)) return true;
+            
+            return false;
+        }
+
+        function getUSMarketState(sym) {
+            let now = new Date();
+            let day = now.getUTCDay();
+            let utcHours = now.getUTCHours() + (now.getUTCMinutes() / 60);
+            let istHours = (utcHours + 5.5) % 24;
+
+            if (day === 0 || day === 6) {
+                if (["DOW", "NASDAQ", "SP500"].includes(sym) && day === 0 && istHours >= 21.0) return "FUTURES";
+                return "CLOSED";
+            }
+            if (["DOW", "NASDAQ", "SP500"].includes(sym)) {
+                if (istHours >= 19.0 || istHours <= 2.0) return "MAIN_LIVE";
+                else return "FUTURES";
+            }
+            return checkMarketLive(sym) ? "MAIN_LIVE" : "CLOSED";
+        }
+
+        function updateUSMarketDot(dotId, sym) {
+            let el = document.getElementById(dotId);
+            if (!el) return;
+            let state = getUSMarketState(sym);
+            if (state === "MAIN_LIVE") el.className = "mini-dot mini-dot-live";
+            else if (state === "FUTURES") el.className = "mini-dot mini-dot-futures";
+            else el.className = "mini-dot mini-dot-closed";
+        }
+
+        function updateDotStatus(dotId, isLive) {
+            let el = document.getElementById(dotId);
+            if (!el) return;
+            el.className = isLive ? "mini-dot mini-dot-live" : "mini-dot mini-dot-closed";
+        }
+
+        function updateElement(ltpId, subId, ltpVal, chVal, chpVal, prefixType="none") {
+            let elLtp = document.getElementById(ltpId);
+            let elSub = document.getElementById(subId);
+            if(!elLtp || !elSub) return;
+
+            let prefix = prefixType === "usd" ? "$" : (prefixType === "inr" ? "₹" : "");
+            elLtp.innerText = prefix + Number(ltpVal).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            let sign = chVal >= 0 ? "+" : "";
+            elSub.innerText = `${sign}${Number(chVal).toFixed(2)} (${sign}${Number(chpVal).toFixed(2)}%)`;
+
+            let colorClass = chVal >= 0 ? "green-neon" : "red-neon";
+            elLtp.className = elLtp.className.replace(/green-neon|red-neon|white-text/g, '') + " " + colorClass;
+            elSub.className = elSub.className.replace(/green-neon|red-neon|white-text/g, '') + " " + colorClass;
+        }
+
+        let activeInspectedSector = "IT";
+        let autoDetectEnabled = true;
+
+        async function fetchSectorData() {
+            try {
+                let res = await fetch(`/api/sectors`);
+                let allSectors = await res.json();
+                
+                if (Array.isArray(allSectors) && allSectors.length > 0) {
+                    let movers = allSectors.filter(s => Math.abs(s.chp) > 0.25);
+                    let deadZone = allSectors.filter(s => Math.abs(s.chp) <= 0.25);
+
+                    let displayList = [];
+                    if (movers.length >= 12) {
+                        movers.sort((a, b) => Math.abs(b.chp) - Math.abs(a.chp));
+                        displayList = movers.slice(0, 12);
+                    } else {
+                        deadZone.sort((a, b) => Math.abs(b.chp) - Math.abs(a.chp));
+                        displayList = [...movers, ...deadZone.slice(0, 12 - movers.length)];
+                    }
+
+                    displayList.sort((a, b) => b.chp - a.chp);
+
+                    if (autoDetectEnabled && displayList.length > 0) {
+                        activeInspectedSector = displayList[0].name;
+                    }
+
+                    let gridHtml = "";
+                    displayList.forEach((item, index) => {
+                        let chp = item.chp;
+                        let isPositive = chp >= 0;
+                        let absVal = Math.abs(chp);
+
+                        let alpha = Math.min(Math.max(absVal / 2.5, 0.12), 0.38);
+                        let bgColor = isPositive ? `rgba(16, 185, 129, ${alpha})` : `rgba(239, 68, 68, ${alpha})`;
+                        let borderColor = isPositive ? `rgba(16, 185, 129, 0.7)` : `rgba(239, 68, 68, 0.7)`;
+                        let shadowColor = isPositive ? `rgba(16, 185, 129, 0.2)` : `rgba(239, 68, 68, 0.2)`;
+                        let textColor = isPositive ? "green-neon" : "red-neon";
+                        let sign = isPositive ? "+" : "";
+
+                        let isSelected = item.name === activeInspectedSector ? "active-sector" : "";
+
+                        gridHtml += `
+                        <div class="heat-tile ${isSelected}" onclick="manualSelectSector('${item.name}')" style="background-color: ${bgColor}; border: 1px solid ${borderColor}; box-shadow: 0 0 8px ${shadowColor};">
+                            <div class="tile-header">
+                                <span class="tile-name">${item.name}</span>
+                                <span class="tile-rank">#${index + 1}</span>
+                            </div>
+                            <div class="tile-price">${Number(item.ltp).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 1})}</div>
+                            <div class="tile-pct ${textColor}">${sign}${chp.toFixed(2)}%</div>
+                        </div>`;
+                    });
+                    document.getElementById('heatmapContainer').innerHTML = gridHtml;
+
+                    let radarHtml = "";
+                    displayList.slice(0, 7).forEach(s => {
+                        let pClass = s.chp >= 0 ? "green-neon" : "red-neon";
+                        let isSel = s.name === activeInspectedSector ? "active" : "";
+                        let icon = s.chp >= 0 ? "🟢" : "🔴";
+                        let sign = s.chp >= 0 ? "+" : "";
+                        radarHtml += `<div class="radar-pill ${isSel}" onclick="manualSelectSector('${s.name}')">${icon} <span style="color:#fff;">${s.name}</span> <span class="${pClass}">${sign}${s.chp.toFixed(2)}%</span></div>`;
+                    });
+                    document.getElementById('radarBar').innerHTML = radarHtml;
+
+                    fetchConstituentsData(activeInspectedSector);
+                }
+            } catch (e) {}
+        }
+
+        function manualSelectSector(name) {
+            autoDetectEnabled = false;
+            activeInspectedSector = name;
+            fetchSectorData();
+        }
+
+        async function fetchConstituentsData(secName) {
+            try {
+                let res = await fetch(`/api/constituents?sector=${secName}`);
+                let payload = await res.json();
+                
+                if (!payload || !payload.stocks) return;
+
+                document.getElementById('activeSectorName').innerText = "NIFTY " + secName;
+                let stocks = payload.stocks;
+                let top3Bull = payload.top3_bull_count || 0;
+                let top3Bear = payload.top3_bear_count || 0;
+
+                let advCount = stocks.filter(s => s.chp > 0).length;
+                let decCount = stocks.length - advCount;
+                let advPct = (advCount / stocks.length) * 100;
+
+                document.getElementById('breadthText').innerText = `${advCount} ADV / ${decCount} DEC`;
+                document.getElementById('breadthBarFill').style.width = `${advPct}%`;
+
+                let banner = document.getElementById('verdictBanner');
+                let verdictText = document.getElementById('verdictText');
+                let verdictSub = document.getElementById('verdictSub');
+
+                if (top3Bull === 3) {
+                    banner.className = "verdict-banner verdict-strong-bull";
+                    verdictText.innerText = "🔥 3/3 TOP GIANTS BULLISH (100% INSTITUTIONAL BACKING)";
+                    verdictSub.innerText = `${Math.round(advPct)}% Sector Breadth • High Conviction CE`;
+                } else if (top3Bear === 3) {
+                    banner.className = "verdict-banner verdict-strong-bear";
+                    verdictText.innerText = "🩸 3/3 TOP GIANTS BEARISH (100% INSTITUTIONAL DUMP)";
+                    verdictSub.innerText = `${Math.round((decCount/stocks.length)*100)}% Sector Breadth • High Conviction PE`;
+                } else if (top3Bull === 2 && advCount >= 3) {
+                    banner.className = "verdict-banner verdict-strong-bull";
+                    verdictText.innerText = "🟢 2/3 TOP GIANTS BULLISH (VALID EXPANSION)";
+                    verdictSub.innerText = "Majority Heavyweights Backing The Trend";
+                } else if (top3Bear === 2 && decCount >= 3) {
+                    banner.className = "verdict-banner verdict-strong-bear";
+                    verdictText.innerText = "🔴 2/3 TOP GIANTS BEARISH (VALID DUMP)";
+                    verdictSub.innerText = "Majority Heavyweights Pushing Down";
+                } else {
+                    banner.className = "verdict-banner verdict-trap";
+                    verdictText.innerText = "⚠️ TOP 3 GIANTS DIVERGENCE (TRAP RISK)";
+                    verdictSub.innerText = `Only 1 Giant moving • Lack of Institutional Alignment!`;
+                }
+
+                let rowsHtml = "";
+                stocks.forEach((stk, idx) => {
+                    let sign = stk.chp >= 0 ? "+" : "";
+                    let pctClass = stk.chp >= 0 ? "green-neon" : "red-neon";
+                    let vwapClass = stk.is_above_vwap ? "vwap-above" : "vwap-below";
+                    let highStatus = stk.near_high ? "🎯 Near High" : "Normal";
+                    let giantBadge = idx < 3 ? `<span style="color:#fbbf24; font-size:7.5px;">★ G${idx+1}</span>` : "";
+
+                    let sigClass = "sig-neutral";
+                    if (stk.signal.includes("BUY")) sigClass = "sig-buy";
+                    else if (stk.signal.includes("SELL")) sigClass = "sig-sell";
+                    else if (stk.signal.includes("MOMENTUM")) sigClass = "sig-buy";
+
+                    rowsHtml += `
+                    <tr>
+                        <td><div class="stock-name-cell">${stk.symbol} ${giantBadge} <span class="weight-tag">${stk.weight}</span></div></td>
+                        <td>₹${Number(stk.ltp).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 1})}</td>
+                        <td class="${pctClass}">${sign}${Number(stk.chp).toFixed(2)}%</td>
+                        <td class="${vwapClass}">${stk.vwap_text}</td>
+                        <td style="color: #38bdf8;">${highStatus}</td>
+                        <td style="text-align: right;"><span class="pill-signal ${sigClass}">${stk.signal}</span></td>
+                    </tr>`;
+                });
+                document.getElementById('constituentsBody').innerHTML = rowsHtml;
+            } catch (e) {}
+        }
+
+        async function fetchSmcSignals() {
+            try {
+                let res = await fetch(`/api/smc-signals`);
+                let data = await res.json();
+
+                if (!data) return;
+
+                if (Array.isArray(data.queue) && data.queue.length > 0) {
+                    let qHtml = "";
+                    data.queue.forEach(q => {
+                        let sign = q.chp >= 0 ? "+" : "";
+                        let pClass = q.chp >= 0 ? "green-neon" : "red-neon";
+                        qHtml += `
+                        <div class="queue-card">
+                            <div class="queue-top">
+                                <span class="queue-name">${q.symbol} <span style="font-size:8px; font-weight:700;" class="${pClass}">(${sign}${Number(q.chp).toFixed(1)}%)</span></span>
+                                <span class="queue-rank">${q.rank}</span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span class="queue-score">Score: ${q.score}%</span>
+                                <span class="queue-status">${q.desc}</span>
+                            </div>
+                        </div>`;
+                    });
+                    document.getElementById('queueGridContainer').innerHTML = qHtml;
+                }
+
+                if (Array.isArray(data.active) && data.active.length > 0) {
+                    let html = "";
+                    data.active.forEach(sig => {
+                        let isBull = sig.type === "CE";
+                        let isInvalid = sig.is_invalid;
+
+                        let cardClass = isInvalid ? "card-invalid-extreme" : (isBull ? "card-bullish" : "card-bearish");
+                        let badgeClass = isInvalid ? "action-extreme-exit" : (isBull ? "action-ce" : "action-pe");
+                        let actionTitle = isInvalid ? "🚨 EXIT POSITION" : sig.action;
+                        let pctClass = isBull ? "green-neon" : "red-neon";
+                        let sign = isBull ? "+" : "";
+
+                        let tagHtml = "";
+                        let confluencesList = isInvalid ? ["⛔ OB SMASHED", "LIQUIDITY TRAP", "CUT LOSSES"] : sig.confluences;
+                        confluencesList.forEach(c => {
+                            let tagStyle = isInvalid ? "smc-tag smc-tag-extreme-alarm" : "smc-tag";
+                            tagHtml += `<span class="${tagStyle}">${c}</span>`;
+                        });
+
+                        let topBannerHtml = isInvalid ? `<div class="emergency-banner-top">🚨 ORDER BLOCK BROKEN • EXIT IMMEDIATELY 🚨</div>` : "";
+                        let stripClass = isInvalid ? "levels-strip levels-strip-extreme" : "levels-strip";
+                        let footerClass = isInvalid ? "card-footer footer-extreme" : "card-footer";
+                        let statusText = isInvalid ? "🚨 OB BROKEN / CUT TRADE" : sig.status;
+                        let statusColor = isInvalid ? "#ffffff; font-weight:900;" : "#38bdf8;";
+
+                        let strikeColor = isInvalid ? "#ffffff" : "#fbbf24";
+                        let premText = isInvalid ? `<span style="color:#ffffff; font-weight:900;">INVALIDATED</span>` : `Prem: ₹${sig.premium_ltp}`;
+
+                        html += `
+                        <div class="signal-card ${cardClass}">
+                            ${topBannerHtml}
+                            <div>
+                                <div class="priority-strip ${sig.priorityClass || 'priority-p1'}">
+                                    <span>${sig.priority || '👑 ALPHA'}</span>
+                                    <span>${sig.score_text || '95%'}</span>
+                                </div>
+                                <div class="card-top-row">
+                                    <div class="stock-action-group">
+                                        <span class="stock-sym">${sig.symbol}</span>
+                                        <span class="sec-pill">${sig.sector}</span>
+                                        <span class="action-badge ${badgeClass}">${actionTitle}</span>
+                                    </div>
+                                    <div class="price-strike-box">
+                                        <span class="opt-strike" style="color: ${strikeColor};">${sig.strike}</span>
+                                        <span class="stock-ltp-sub">
+                                            <span class="premium-text">${premText}</span> 
+                                            | Spot: ₹${Number(sig.ltp).toLocaleString('en-IN', {minimumFractionDigits: 1})}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="confluence-row">${tagHtml}</div>
+                                <div class="${stripClass}">
+                                    <div class="level-box"><span class="level-lbl" style="${isInvalid?'color:#ffffff;':''}">Prem Entry</span><span class="level-val" style="color:${isInvalid?'#ffffff':'#38bdf8'};">${sig.prem_entry}</span></div>
+                                    <div class="level-box"><span class="level-lbl" style="${isInvalid?'color:#ffcccc;':''}">🎯 Sniper SL</span><span class="level-val" style="color:${isInvalid?'#ff4d4d':'#f87171'}; font-weight:900;">${sig.prem_sl}</span></div>
+                                    <div class="level-box"><span class="level-lbl" style="${isInvalid?'color:#ffffff;':''}">Target (${sig.rr_ratio})</span><span class="level-val" style="color:${isInvalid?'#ffffff':'#34d399'};">${isInvalid?'CANCELLED':sig.prem_tp}</span></div>
+                                </div>
+                            </div>
+                            <div class="${footerClass}">
+                                <span>🚨 TRIGGER: Spot <span style="color:${isInvalid?'#ffffff':'#f87171'};">${sig.spot_sl}</span></span>
+                                <span>STATUS: <span style="color:${statusColor}">${statusText}</span></span>
+                            </div>
+                        </div>`;
+                    });
+                    document.getElementById('signalCardsContainer').innerHTML = html;
+                }
+            } catch (e) {}
+        }
+
+        async function fetchSection8Radar() {
+            try {
+                let res = await fetch(`/api/section8-radar`);
+                let data = await res.json();
+                if (!data || !Array.isArray(data.active)) return;
+
+                let html = "";
+                data.active.forEach(card => {
+                    let isBull = card.type === "CE";
+                    let cardClass = card.is_invalid ? "card-invalid-extreme" : (isBull ? "card-bullish" : "card-bearish");
+                    let badgeClass = card.is_invalid ? "action-extreme-exit" : (isBull ? "action-ce" : "action-pe");
+                    let actionTitle = card.is_invalid ? "🚨 EXIT / INVALID" : card.action;
+                    let pctClass = card.chp >= 0 ? "green-neon" : "red-neon";
+                    let sign = card.chp >= 0 ? "+" : "";
+
+                    let topBannerHtml = card.is_invalid ? `<div class="emergency-banner-top">🚨 SETUP INVALIDATED • EXIT IMMEDIATELY 🚨</div>` : "";
+                    let strikeColor = card.is_invalid ? "#ffffff" : "#fbbf24";
+                    let premText = card.is_invalid ? `<span style="color:#ffffff; font-weight:900;">INVALIDATED</span>` : `Prem: ${card.premium}`;
+
+                    let tagHtml = "";
+                    card.strategies_matched.forEach(st => {
+                        let tagStyle = card.is_invalid ? "smc-tag smc-tag-extreme-alarm" : "smc-tag";
+                        tagHtml += `<span class="${tagStyle}">${st}</span>`;
+                    });
+
+                    html += `
+                    <div class="signal-card ${cardClass}">
+                        ${topBannerHtml}
+                        <div>
+                            <div class="priority-strip ${card.priorityClass || 'priority-p1'}">
+                                <span>${card.priority}</span>
+                                <span>${card.active_setup_name}</span>
+                            </div>
+                            <div class="card-top-row">
+                                <div class="stock-action-group">
+                                    <span class="stock-sym">${card.symbol}</span>
+                                    <span class="sec-pill">LOT: ${card.lot}</span>
+                                    <span class="action-badge ${badgeClass}">${actionTitle}</span>
+                                </div>
+                                <div class="price-strike-box">
+                                    <span class="opt-strike" style="color: ${strikeColor};">${card.itm_strike}</span>
+                                    <span class="stock-ltp-sub">
+                                        <span class="premium-text">${premText}</span> 
+                                        | Spot: ₹${Number(card.spot).toLocaleString('en-IN', {minimumFractionDigits: 1})}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="confluence-row">${tagHtml}</div>
+                            <div class="levels-strip">
+                                <div class="level-box"><span class="level-lbl">⚡ Micro Scalp</span><span class="level-val" style="color:#34d399;">${card.scalp_target}</span></div>
+                                <div class="level-box"><span class="level-lbl">🎯 Macro Trend</span><span class="level-val" style="color:#38bdf8;">${card.macro_target}</span></div>
+                                <div class="level-box"><span class="level-lbl">Sniper SL</span><span class="level-val" style="color:#f87171;">${card.sniper_sl}</span></div>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <span>⚖️ Breadth: <span style="color:#34d399;">${card.weighted_breadth}</span></span>
+                            <span>STATUS: <span style="color:#38bdf8;">${card.status}</span></span>
+                        </div>
+                    </div>`;
+                });
+                document.getElementById('section8GridContainer').innerHTML = html;
+            } catch (e) {}
+        }
+
+        async function fetchOiDecoder() {
+            try {
+                let res = await fetch(`/api/oi-decoder`);
+                let data = await res.json();
+                if (!data || !data.stock || !data.index) return;
+
+                let s = data.stock;
+                document.getElementById('stkSym').innerText = s.symbol;
+                document.getElementById('stkOpt').innerText = s.strike;
+                document.getElementById('stkSpot').innerText = s.spot;
+                
+                let sBox = document.getElementById('stkVerdictBox');
+                sBox.className = `big-verdict-box verdict-${s.verdict_type}`;
+                document.getElementById('stkVerdictTitle').innerText = s.verdict_title;
+                document.getElementById('stkVerdictDesc').innerText = s.verdict_desc;
+
+                document.getElementById('stkPcr').innerText = s.pcr;
+                document.getElementById('stkPcr').className = `m-val ${s.pcr_class}`;
+                document.getElementById('stkTrapRisk').innerText = s.trap_risk;
+                document.getElementById('stkTrapRisk').className = `m-val ${s.trap_class}`;
+                document.getElementById('stkMaxPain').innerText = s.max_pain;
+
+                document.getElementById('stkCallPct').innerText = s.call_pct;
+                document.getElementById('stkPutPct').innerText = s.put_pct;
+                document.getElementById('stkCallBar').style.width = s.call_bar;
+                document.getElementById('stkPutBar').style.width = s.put_bar;
+
+                let idx = data.index;
+                document.getElementById('idxName').innerText = idx.name;
+                document.getElementById('idxSpot').innerText = idx.spot;
+                
+                let idxTag = document.getElementById('idxSyncTag');
+                idxTag.innerText = idx.tag;
+                idxTag.style.color = idx.tag_color;
+                idxTag.style.borderColor = idx.tag_border;
+
+                let iBox = document.getElementById('idxVerdictBox');
+                iBox.className = `big-verdict-box verdict-${idx.verdict_type}`;
+                document.getElementById('idxVerdictTitle').innerText = idx.verdict_title;
+                document.getElementById('idxVerdictDesc').innerText = idx.verdict_desc;
+
+                document.getElementById('idxPcr').innerText = idx.pcr;
+                document.getElementById('idxPcr').className = `m-val ${idx.pcr_class}`;
+                document.getElementById('idxSup').innerText = idx.support;
+                document.getElementById('idxRes').innerText = idx.resistance;
+
+                document.getElementById('idxCallPct').innerText = idx.call_pct;
+                document.getElementById('idxPutPct').innerText = idx.put_pct;
+                document.getElementById('idxCallBar').style.width = idx.call_bar;
+                document.getElementById('idxPutBar').style.width = idx.put_bar;
+
+            } catch (e) {}
+        }
+
+        async function fetchIndianData() {
+            try {
+                const results = await Promise.allSettled(
+                    indianList.map(item => fetch(`/api/spot?symbol=${item.id}`).then(r => r.json()))
+                );
+                results.forEach((res, i) => {
+                    let sym = indianList[i].id;
+                    updateDotStatus(`dot-${sym}`, checkMarketLive(sym));
+
+                    if (res.status === "fulfilled" && res.value && res.value.ltp !== undefined) {
+                        updateElement(`ltp-${sym}`, `sub-${sym}`, res.value.ltp, res.value.ch, res.value.chp);
+                    }
+                });
+            } catch (e) {}
+        }
+
+        async function fetchGlobalData() {
+            const globals = ["DOW", "NASDAQ", "SP500", "CRUDE", "BRENT", "XAUUSD", "GOLD_MCX", "NIKKEI", "HANGSENG"];
+            try {
+                const results = await Promise.allSettled(
+                    globals.map(sym => fetch(`/api/global?symbol=${sym}`).then(r => r.json()))
+                );
+                results.forEach((res, i) => {
+                    let symbol = globals[i];
+                    
+                    if (["DOW", "NASDAQ", "SP500"].includes(symbol)) {
+                        updateUSMarketDot(`dot-${symbol}`, symbol);
+                    } else if (["CRUDE", "BRENT"].includes(symbol)) {
+                        updateDotStatus(`dot-OIL`, checkMarketLive(symbol));
+                    } else if (["XAUUSD", "GOLD_MCX"].includes(symbol)) {
+                        updateDotStatus(`dot-GOLD`, checkMarketLive(symbol));
+                    } else {
+                        updateDotStatus(`dot-${symbol}`, checkMarketLive(symbol));
+                    }
+
+                    if (res.status === "fulfilled" && res.value && res.value.ltp !== undefined) {
+                        let prefixType = (symbol === "XAUUSD" || symbol === "CRUDE" || symbol === "BRENT") ? "usd" : (symbol === "GOLD_MCX" ? "inr" : "none");
+                        updateElement(`ltp-${symbol}`, `sub-${symbol}`, res.value.ltp, res.value.ch, res.value.chp, prefixType);
+                    }
+                });
+
+                const tickResults = await Promise.allSettled(
+                    tickerSymbols.map(sym => fetch(`/api/global?symbol=${sym}`).then(r => r.json()))
+                );
+                tickResults.forEach((res, i) => {
+                    let sym = tickerSymbols[i];
+                    updateDotStatus(`tdot-${sym}`, checkMarketLive(sym));
+                    updateDotStatus(`tdot-${sym}-dup`, checkMarketLive(sym));
+
+                    if (res.status === "fulfilled" && res.value && res.value.ltp !== undefined) {
+                        let t1 = document.getElementById(`tick-${sym}`), t2 = document.getElementById(`tick-${sym}-dup`);
+                        let sub1 = document.getElementById(`tsub-${sym}`), sub2 = document.getElementById(`tsub-${sym}-dup`);
+                        let valStr = Number(res.value.ltp).toLocaleString('en-US');
+                        let sign = res.value.ch >= 0 ? "+" : "";
+                        let subStr = ` (${sign}${Number(res.value.chp).toFixed(2)}%)`;
+                        let colorClass = res.value.ch >= 0 ? "green-neon" : "red-neon";
+
+                        if(t1) t1.innerText = valStr;
+                        if(t2) t2.innerText = valStr;
+                        if(sub1) { sub1.innerText = subStr; sub1.className = "ticker-val " + colorClass; }
+                        if(sub2) { sub2.innerText = subStr; sub2.className = "ticker-val " + colorClass; }
+                    }
+                });
+            } catch (e) {}
+        }
+
+        fetchIndianData(); fetchGlobalData(); fetchSectorData(); fetchSmcSignals(); fetchSection8Radar(); fetchOiDecoder();
+        setInterval(fetchIndianData, 2000);   
+        setInterval(fetchSectorData, 3000);   
+        setInterval(fetchSmcSignals, 2000);   
+        setInterval(fetchSection8Radar, 2000);
+        setInterval(fetchOiDecoder, 2000);   
+        setInterval(fetchGlobalData, 6000);  
+    </script>
+</body>
+</html>

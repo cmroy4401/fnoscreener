@@ -1,100 +1,23 @@
 import os
 import logging
-from datetime import datetime
-import pyotp
-import requests
-import urllib.parse
-import base64
 from dotenv import load_dotenv
+from fyers_apiv3 import fyersModel
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-class FyersAutoLogin:
-    CLIENT_ID = os.getenv("FYERS_CLIENT_ID")
-    SECRET_KEY = os.getenv("FYERS_SECRET_KEY")
-    USER_ID = os.getenv("FYERS_USER_ID")
-    PIN = os.getenv("FYERS_PIN")
-    TOTP_KEY = os.getenv("FYERS_TOTP_KEY")
-    REDIRECT_URI = os.getenv("FYERS_REDIRECT_URI", "https://127.0.0.1:8000/")
-    
-    TOKEN_FILE = "fyers_token.txt"
-
-    @classmethod
-    def get_token(cls):
-        if os.path.exists(cls.TOKEN_FILE):
-            file_date = datetime.fromtimestamp(os.path.getmtime(cls.TOKEN_FILE)).date()
-            if file_date == datetime.now().date():
-                with open(cls.TOKEN_FILE, 'r') as f:
-                    return f.read().strip()
-        
-        logger.info("Generating New Fyers Token via Zero-Click Auto-Login...")
-        try:
-            from fyers_apiv3 import fyersModel
-            
-            if not cls.TOTP_KEY or not cls.CLIENT_ID or not cls.USER_ID or not cls.PIN:
-                logger.error("❌ Auto-Login Failed: Missing Fyers Environment Variables!")
-                return None
-
-            totp = pyotp.TOTP(cls.TOTP_KEY).now()
-            app_id_hash = cls.CLIENT_ID.split('-')[0]
-            headers = {"Accept": "application/json", "User-Agent": "Mozilla/5.0"}
-            
-            def safe_json(res, step_name):
-                try:
-                    return res.json()
-                except Exception:
-                    logger.error(f"❌ {step_name} returned non-JSON response. Body: {res.text[:300]}")
-                    raise ValueError(f"Invalid response from {step_name}")
-
-            # Step A: Send OTP
-            payload1 = {"fy_id": base64.b64encode(f"{cls.USER_ID}".encode()).decode(), "app_id": "2"}
-            res1 = requests.post("https://api-t2.fyers.in/vag/public/v2/send_login_otp", json=payload1, headers=headers)
-            res1_json = safe_json(res1, "Step A (Send OTP)")
-            
-            # Step B: Verify OTP
-            payload2 = {"request_key": res1_json["request_key"], "otp": totp}
-            res2 = requests.post("https://api-t2.fyers.in/vag/public/v2/verify_otp", json=payload2, headers=headers)
-            res2_json = safe_json(res2, "Step B (Verify OTP)")
-            
-            # Step C: Verify PIN
-            payload3 = {"request_key": res2_json["request_key"], "identity_type": "pin", "identifier": base64.b64encode(f"{cls.PIN}".encode()).decode()}
-            res3 = requests.post("https://api-t2.fyers.in/vag/public/v2/verify_pin", json=payload3, headers=headers)
-            res3_json = safe_json(res3, "Step C (Verify PIN)")
-            access_token_vag = res3_json["data"]["access_token"]
-            
-            # Step D: Get Auth Code
-            headers_auth = {"authorization": f"Bearer {access_token_vag}", "content-type": "application/json"}
-            payload4 = {"fyers_id": cls.USER_ID, "app_id": app_id_hash, "redirect_uri": cls.REDIRECT_URI, "appType": "100", "code_challenge": "", "state": "None", "scope": "", "nonce": "", "response_type": "code", "create_cookie": True}
-            res4 = requests.post("https://api.fyers.in/api/v2/token", json=payload4, headers=headers_auth)
-            res4_json = safe_json(res4, "Step D (Token)")
-            
-            parsed = urllib.parse.urlparse(res4_json["Url"])
-            auth_code = urllib.parse.parse_qs(parsed.query)["auth_code"][0]
-            
-            # Step E: Generate Final Token
-            session = fyersModel.SessionModel(client_id=cls.CLIENT_ID, secret_key=cls.SECRET_KEY, redirect_uri=cls.REDIRECT_URI, response_type="code", grant_type="authorization_code")
-            session.set_token(auth_code)
-            token_response = session.generate_token()
-            access_token = token_response["access_token"]
-            
-            # Save for the day
-            with open(cls.TOKEN_FILE, 'w') as f:
-                f.write(access_token)
-            logger.info("✅ Fyers Auto-Login Successful! Token Saved.")
-            return access_token
-        except Exception as e:
-            logger.error(f"❌ Auto-Login Pipeline Failed: {e}")
-            return None
+CLIENT_ID = os.getenv("FYERS_CLIENT_ID")
+ACCESS_TOKEN = os.getenv("FYERS_ACCESS_TOKEN")
 
 def get_fyers_client():
     try:
-        from fyers_apiv3 import fyersModel
-        access_token = FyersAutoLogin.get_token()
-        if access_token:
-            return fyersModel.FyersModel(client_id=FyersAutoLogin.CLIENT_ID, is_async=False, token=access_token, log_path="")
+        if CLIENT_ID and ACCESS_TOKEN:
+            return fyersModel.FyersModel(client_id=CLIENT_ID, is_async=False, token=ACCESS_TOKEN, log_path="")
+        else:
+            logger.error("❌ Missing FYERS_CLIENT_ID or FYERS_ACCESS_TOKEN in environment variables!")
+            return None
     except Exception as e:
         logger.error(f"Failed to initialize client: {e}")
-    return None
+        return None
 
 fyers = get_fyers_client()
